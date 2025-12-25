@@ -439,10 +439,14 @@ const Subjects: React.FC = () => {
       relevantHistory.forEach(session => {
           const tName = session.topic;
           if (!topicMap[tName]) {
+              // FIX: Read existing status from subject, do not hardcode 'not-started'
+              const existingStatus = currentSubject?.topicStatuses?.[tName] || 'not-started';
+              
               topicMap[tName] = {
                   name: tName, duration: 0, totalQuestions: 0, totalCorrect: 0, 
                   totalIncorrect: 0, totalEmpty: 0, accuracy: 0, net: 0, 
-                  status: 'not-started', testLogs: []
+                  status: existingStatus, 
+                  testLogs: []
               };
           }
 

@@ -1,5 +1,4 @@
-
-const CACHE_NAME = 'studyflow-pro-v5';
+const CACHE_NAME = 'studyflow-pro-v3';
 const ICON_URL = 'https://cdn-icons-png.flaticon.com/512/3209/3209265.png';
 
 const EXTERNAL_ASSETS = [
@@ -20,9 +19,9 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll([
-        './',
-        './index.html',
-        './manifest.json',
+        '/',
+        '/index.html',
+        '/manifest.json',
         ...EXTERNAL_ASSETS
       ]);
     })
@@ -46,16 +45,27 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Navigation Requests (HTML): Network First, then Cache, then Fallback to index.html
+  const url = new URL(event.request.url);
+
+  // 1. Virtual Icon Proxy: Serve external icon as if it is local (Required for PWA Install)
+  if (url.pathname === '/icon-192.png' || url.pathname === '/icon-512.png') {
+    event.respondWith(
+      caches.match(ICON_URL).then((cached) => {
+        return cached || fetch(ICON_URL).then(res => {
+          const resClone = res.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(ICON_URL, resClone));
+          return res;
+        });
+      })
+    );
+    return;
+  }
+
+  // 2. Navigation Requests (HTML): Network First, then Cache
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // If server returns 404 (Not Found), serve the cached index.html (SPA routing)
-          if (!response || response.status === 404) {
-            return caches.match('./index.html');
-          }
-          
           const resClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, resClone);
@@ -63,15 +73,13 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Offline fallback
-          return caches.match('./index.html')
-            .then(res => res || caches.match('./'));
+          return caches.match(event.request).then(res => res || caches.match('/'));
         })
     );
     return;
   }
 
-  // Asset Requests (JS, CSS, Images): Cache First, then Network
+  // 3. Asset Requests (JS, CSS, Images): Cache First, then Network
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {

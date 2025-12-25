@@ -187,7 +187,14 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const addTopicToSubject = (subjectId: string, topic: string) => {
       setSubjects(prev => prev.map(s => {
           if (s.id === subjectId && !s.topics.includes(topic)) {
-              return { ...s, topics: [...s.topics, topic], topicStatuses: { ...(s.topicStatuses || {}), [topic]: 'not-started' } };
+              return { 
+                  ...s, 
+                  topics: [...s.topics, topic], 
+                  topicStatuses: { 
+                      ...(s.topicStatuses || {}), 
+                      [topic]: (s.topicStatuses && s.topicStatuses[topic]) ? s.topicStatuses[topic] : 'not-started' 
+                  } 
+              };
           }
           return s;
       }));
@@ -446,18 +453,13 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const timerRef = useRef<number | null>(null);
     const ambientAudioRef = useRef<HTMLAudioElement | null>(null);
-    
-    // Use refs for settings to avoid clearing interval when settings change,
-    // but still have access to the latest values inside the interval closure.
-    const settingsRef = useRef(settings);
-    useEffect(() => { settingsRef.current = settings; }, [settings]);
 
     useEffect(() => {
         if (activeSession) localStorage.setItem('study_active_session', JSON.stringify(activeSession));
         else localStorage.removeItem('study_active_session');
     }, [activeSession]);
 
-    // Audio Logic
+    // Audio & Timer Logic
     useEffect(() => {
         if (!activeSession || activeSession.isPaused || activeSession.isCompleted || !settings.soundEnabled) {
             if (ambientAudioRef.current) { ambientAudioRef.current.pause(); ambientAudioRef.current = null; }
@@ -478,94 +480,62 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [activeSession?.isActive, activeSession?.isPaused, activeSession?.ambientSound, settings.soundEnabled, settings.soundVolume]);
 
     const playAlarm = () => {
-        // Use ref for settings to ensure we have latest volume even inside intervals
-        const currentSettings = settingsRef.current;
-        if (currentSettings.soundEnabled) {
+        if (settings.soundEnabled) {
             const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-            audio.volume = currentSettings.soundVolume;
+            audio.volume = settings.soundVolume;
             audio.play().catch(e => console.log('Alarm error', e));
         }
-        if (currentSettings.notificationsEnabled && Notification.permission === 'granted') {
+        if (settings.notificationsEnabled && Notification.permission === 'granted') {
             new Notification("Süre Doldu!", { body: "Oturum tamamlandı.", icon: "/icon.png" });
         }
     };
 
-    // The Ticking Heartbeat - Robust Background Handling
+    // The Ticking Heartbeat
     useEffect(() => {
-        // Clear any existing timer to prevent duplicates
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-        }
-
-        if (activeSession && activeSession.isActive && !activeSession.isPaused && !activeSession.isCompleted) {
+        if (activeSession && !activeSession.isPaused && !activeSession.isCompleted) {
             timerRef.current = window.setInterval(() => {
                 setActiveSession(prev => {
-                    if (!prev || prev.isPaused || prev.isCompleted) return prev;
-                    
+                    if (!prev) return null;
                     const now = Date.now();
-                    // Fallback to now if lastTick is missing (legacy safety)
-                    const lastTick = prev.lastTick || now; 
+                    const lastTick = prev.lastTick || now;
                     const delta = now - lastTick;
-
-                    // If less than 1 second passed (micro-throttling), do nothing
                     if (delta < 1000) return prev;
                     
-                    // Calculate precise seconds passed (robust against background tab sleep)
                     const secondsPassed = Math.floor(delta / 1000);
-                    
-                    // Calculate new anchor time aligned to the second boundary to prevent drift
                     const remainder = delta % 1000;
                     const newLastTick = now - remainder;
 
                     if (prev.mode === 'stopwatch') {
-                        return { 
-                            ...prev, 
-                            timeLeft: prev.timeLeft + secondsPassed, 
-                            lastTick: newLastTick 
-                        };
+                        return { ...prev, timeLeft: prev.timeLeft + secondsPassed, lastTick: newLastTick };
                     } else {
                         const newTime = prev.timeLeft - secondsPassed;
-                        
                         if (newTime <= 0) {
                             playAlarm();
-                            return { 
-                                ...prev, 
-                                timeLeft: 0, 
-                                isCompleted: true, 
-                                lastTick: newLastTick 
-                            };
+                            return { ...prev, timeLeft: 0, isCompleted: true, lastTick: newLastTick };
                         }
-                        
-                        return { 
-                            ...prev, 
-                            timeLeft: newTime, 
-                            lastTick: newLastTick 
-                        };
+                        return { ...prev, timeLeft: newTime, lastTick: newLastTick };
                     }
                 });
             }, 1000);
+        } else {
+            if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
         }
-        
         return () => { if (timerRef.current) clearInterval(timerRef.current); };
-    }, [activeSession?.isActive, activeSession?.isPaused, activeSession?.isCompleted]); // Minimized dependencies for stability
+    }, [activeSession?.isActive, activeSession?.isPaused, activeSession?.isCompleted]);
 
     const startSession = (mode: TimerMode, subjectId: string, topic: string, tags: string[], durationMinutes: number, goal: number, ambient: string | null, taskId?: string) => {
         if (Notification.permission === 'default') Notification.requestPermission();
-        const now = Date.now();
         setActiveSession({
             isActive: true, mode, subjectId, topic, tags, sessionNote: '',
             totalDuration: durationMinutes * 60,
             timeLeft: mode === 'stopwatch' ? 0 : durationMinutes * 60,
             isPaused: false, isCompleted: false, questionGoal: goal,
             stats: { correct: 0, incorrect: 0, empty: 0 }, logs: [],
-            ambientSound: ambient, startTime: now, lastTick: now, linkedTaskId: taskId
+            ambientSound: ambient, startTime: Date.now(), lastTick: Date.now(), linkedTaskId: taskId
         });
     };
 
     const pauseSession = () => setActiveSession(prev => prev ? { ...prev, isPaused: true, lastTick: undefined } : null);
-    
-    // Important: Update lastTick to NOW when resuming to prevent huge jumps from background sleep time
     const resumeSession = () => setActiveSession(prev => prev ? { ...prev, isPaused: false, lastTick: Date.now() } : null);
     
     const stopSession = (status: 'completed' | 'interrupted') => {

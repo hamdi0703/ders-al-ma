@@ -5,16 +5,16 @@ import {
   Trophy, StickyNote, BarChart3, AlertTriangle, 
   Maximize2, Minimize2, Trash2, PenLine, CheckSquare, 
   ListTodo, ClipboardEdit, Flame, Clock, Calendar, ArrowRight, History, XCircle,
-  MoreHorizontal, Flag, Check, X, Percent, Calculator, Medal, Star, Sparkles, CheckCircle2
+  MoreHorizontal, Flag, Check, X, Percent, Calculator, Medal, Star, Sparkles, CheckCircle2,
+  Timer, Brain, Layers, Hourglass
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, CartesianGrid, XAxis } from 'recharts';
 import { useStudy, useTimer } from '../context/StudyContext';
-import { ViewState, TaskPriority } from '../types';
-import TimerDisplay from './TimerDisplay';
+import { ViewState, TaskPriority, Subject } from '../types';
 
-// --- Memoized Sub-Components (Prevents Re-renders) ---
+// --- Sub-Components (Clean & Consistent) ---
 
-const StatCard = React.memo(({ title, value, icon: Icon, colorClass, subText }: any) => (
+const StatCard = ({ title, value, icon: Icon, colorClass, subText }: any) => (
     <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between h-full transition-all hover:shadow-md hover:scale-[1.02]">
         <div className="flex justify-between items-start mb-2">
             <span className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">{title}</span>
@@ -27,9 +27,31 @@ const StatCard = React.memo(({ title, value, icon: Icon, colorClass, subText }: 
             {subText && <span className="text-xs font-medium text-slate-400">{subText}</span>}
         </div>
     </div>
-));
+);
 
-const LiveStatRow = React.memo(({ label, value, type, onUpdate }: { label: string, value: number, type: 'correct' | 'incorrect' | 'empty', onUpdate: (n: number) => void }) => {
+const SectionHeader = ({ title, icon: Icon }: { title: string, icon?: any }) => (
+    <div className="flex items-center gap-2 mb-4">
+        {Icon && <Icon size={18} className="text-primary" />}
+        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">{title}</h3>
+    </div>
+);
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-slate-900/95 backdrop-blur-md text-white text-xs rounded-lg py-2 px-3 shadow-xl border border-slate-700">
+          <p className="font-bold mb-1 opacity-70">{label}</p>
+          <p className="font-bold text-sm">
+            {payload[0].value} dakika
+          </p>
+        </div>
+      );
+    }
+    return null;
+};
+
+// --- Modern Live Stat Control ---
+const LiveStatRow = ({ label, value, type, onUpdate }: { label: string, value: number, type: 'correct' | 'incorrect' | 'empty', onUpdate: (n: number) => void }) => {
     const config = {
         correct: { color: 'green', icon: Check, bg: 'bg-green-500', text: 'text-green-600', border: 'border-green-200' },
         incorrect: { color: 'red', icon: X, bg: 'bg-red-500', text: 'text-red-600', border: 'border-red-200' },
@@ -66,149 +88,31 @@ const LiveStatRow = React.memo(({ label, value, type, onUpdate }: { label: strin
             </div>
         </div>
     );
-});
+};
 
-const LiveStatsPanel = React.memo(({ stats, updateQuestionStats }: any) => {
-    // Derived Calculations
-    const currentNet = stats.correct - (stats.incorrect * 0.25);
-    const totalQs = stats.correct + stats.incorrect + stats.empty;
-    const currentAccuracy = totalQs > 0 ? Math.round((stats.correct / totalQs) * 100) : 0;
-
+// --- CSS Confetti Component ---
+const ConfettiParticles = () => {
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex-1 flex flex-col relative overflow-hidden">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 size={18} className="text-primary" />
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Canlı İstatistik</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                     <div className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center gap-1.5 border border-slate-200 dark:border-slate-600">
-                        <Calculator size={14} className="text-blue-500"/>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Net: {currentNet}</span>
-                     </div>
-                     <div className={`px-3 py-1 rounded-lg flex items-center gap-1.5 border ${currentAccuracy >= 50 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500'}`}>
-                        <Percent size={14} />
-                        <span className="text-xs font-bold">{currentAccuracy}%</span>
-                     </div>
-                </div>
-            </div>
-            
-            <div className="space-y-3 flex-1">
-                <LiveStatRow label="Doğru" value={stats.correct} type="correct" onUpdate={(n) => updateQuestionStats('correct', n)} />
-                <LiveStatRow label="Yanlış" value={stats.incorrect} type="incorrect" onUpdate={(n) => updateQuestionStats('incorrect', n)} />
-                <LiveStatRow label="Boş" value={stats.empty} type="empty" onUpdate={(n) => updateQuestionStats('empty', n)} />
-            </div>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {Array.from({ length: 30 }).map((_, i) => (
+                <div 
+                    key={i}
+                    className="absolute w-2 h-2 rounded-full animate-blob opacity-60"
+                    style={{
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        backgroundColor: ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#a855f7'][Math.floor(Math.random() * 5)],
+                        animationDelay: `${Math.random() * 5}s`,
+                        animationDuration: `${5 + Math.random() * 5}s`,
+                        transform: `scale(${Math.random()})`
+                    }}
+                />
+            ))}
         </div>
     );
-});
+};
 
-const WeeklyActivityChart = React.memo(({ data, weeklyMinutes }: any) => {
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-          return (
-            <div className="bg-slate-900/95 backdrop-blur-md text-white text-xs rounded-lg py-2 px-3 shadow-xl border border-slate-700">
-              <p className="font-bold mb-1 opacity-70">{label}</p>
-              <p className="font-bold text-sm">
-                {payload[0].value} dakika
-              </p>
-            </div>
-          );
-        }
-        return null;
-    };
-
-    return (
-        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-               <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 size={18} className="text-primary" />
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Haftalık Aktivite</h3>
-               </div>
-               <span className="text-2xl font-bold text-slate-900 dark:text-white">
-                   {Math.floor(weeklyMinutes / 60)}<span className="text-sm font-normal text-slate-400">sa</span> {weeklyMinutes % 60}<span className="text-sm font-normal text-slate-400">dk</span>
-               </span>
-            </div>
-            <div className="h-64 w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                   <AreaChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                       <defs>
-                           <linearGradient id="colorWeekly" x1="0" y1="0" x2="0" y2="1">
-                               <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2}/>
-                               <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
-                           </linearGradient>
-                       </defs>
-                       <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
-                       <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
-                       <Tooltip content={<CustomTooltip />} cursor={{stroke: 'var(--color-primary)', strokeWidth: 1}} />
-                       <Area 
-                           type="monotone" 
-                           dataKey="value" 
-                           stroke="var(--color-primary)" 
-                           strokeWidth={2} 
-                           fill="url(#colorWeekly)" 
-                       />
-                   </AreaChart>
-               </ResponsiveContainer>
-            </div>
-        </div>
-    );
-});
-
-const WeeklyGoalRing = React.memo(({ percentage, goalMinutes, toggleSettings }: any) => {
-    const ringRadius = 70;
-    const ringCircumference = 2 * Math.PI * ringRadius;
-    const ringOffset = ringCircumference - (percentage / 100) * ringCircumference;
-
-    return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex flex-col items-center justify-center relative">
-            <div className="w-full flex justify-between items-center absolute top-6 px-6">
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Haftalık Hedef</span>
-                <button onClick={toggleSettings} className="text-xs text-primary font-bold hover:underline">Düzenle</button>
-            </div>
-            
-            <div className="relative mt-4 flex items-center justify-center">
-                <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 160 160">
-                    <circle cx="80" cy="80" r={ringRadius} stroke="currentColor" strokeWidth="12" fill="transparent" className="text-slate-100 dark:text-slate-700" />
-                    <circle 
-                       cx="80" cy="80" r={ringRadius} 
-                       stroke="var(--color-primary)" 
-                       strokeWidth="12" 
-                       fill="transparent" 
-                       strokeDasharray={ringCircumference} 
-                       strokeDashoffset={ringOffset} 
-                       strokeLinecap="round"
-                       className="transition-all duration-1000 ease-out neon-stroke"
-                    />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-3xl font-bold text-slate-900 dark:text-white">%{percentage}</span>
-                </div>
-            </div>
-            <p className="mt-4 text-sm text-slate-500">
-               <span className="font-bold text-slate-700 dark:text-slate-300">{Math.floor(goalMinutes/60)} saat</span> hedefine ulaşmak için çalışmaya devam et.
-            </p>
-        </div>
-    );
-});
-
-// --- Confetti & Summary (Kept same but clean) ---
-const ConfettiParticles = () => (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        {Array.from({ length: 30 }).map((_, i) => (
-            <div key={i} className="absolute w-2 h-2 rounded-full animate-blob opacity-60"
-                style={{
-                    left: `${Math.random() * 100}%`,
-                    top: `${Math.random() * 100}%`,
-                    backgroundColor: ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#a855f7'][Math.floor(Math.random() * 5)],
-                    animationDelay: `${Math.random() * 5}s`,
-                    animationDuration: `${5 + Math.random() * 5}s`,
-                    transform: `scale(${Math.random()})`
-                }}
-            />
-        ))}
-    </div>
-);
-
+// --- REDESIGNED SUMMARY VIEW ---
 const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSession: any, finishSession: any, toggleTask: any }) => {
     const [summaryStats, setSummaryStats] = useState({ 
         correct: activeSession.stats.correct.toString(), 
@@ -230,6 +134,7 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
         });
     };
     
+    // Derived Real-time stats
     const correctVal = parseInt(summaryStats.correct) || 0;
     const incorrectVal = parseInt(summaryStats.incorrect) || 0;
     const emptyVal = parseInt(summaryStats.empty) || 0;
@@ -239,9 +144,15 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto">
+            {/* Background Confetti */}
             <ConfettiParticles />
+            
             <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 animate-slide-up z-10 overflow-hidden">
+                
+                {/* Decorative Top Gradient */}
                 <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+
+                {/* Header */}
                 <div className="text-center mb-8">
                     <div className="inline-block relative">
                         <div className="w-20 h-20 bg-gradient-to-br from-yellow-300 to-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30 mb-2 mx-auto animate-bounce">
@@ -256,7 +167,8 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
                         <span className="text-slate-900 dark:text-white font-bold">{activeSession.topic}</span> oturumu tamamlandı.
                     </p>
                 </div>
-                {/* Score Summary Grid */}
+
+                {/* Score Summary Banner */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
                     <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center">
                         <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
@@ -276,26 +188,58 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
                     </div>
                 </div>
 
+                {/* Input Grid (Card Style) */}
                 <div className="space-y-4 mb-8">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Sonuçlarını Gir</p>
+                    
                     <div className="grid grid-cols-3 gap-3">
-                        {/* Correct/Incorrect/Empty Inputs */}
-                        {['correct', 'incorrect', 'empty'].map(type => (
-                            <div key={type} className="relative group">
-                                <div className={`absolute inset-0 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity ${type === 'correct' ? 'bg-green-500' : type === 'incorrect' ? 'bg-red-500' : 'bg-slate-500'}`}></div>
-                                <div className={`bg-white dark:bg-slate-800 border-2 rounded-2xl p-3 text-center transition-all ${type === 'correct' ? 'border-green-100 dark:border-green-900/30 group-focus-within:border-green-500' : type === 'incorrect' ? 'border-red-100 dark:border-red-900/30 group-focus-within:border-red-500' : 'border-slate-100 dark:border-slate-700 group-focus-within:border-slate-400'}`}>
-                                    <label className={`block text-[10px] font-bold uppercase mb-1 ${type === 'correct' ? 'text-green-600 dark:text-green-400' : type === 'incorrect' ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>{type === 'correct' ? 'Doğru' : type === 'incorrect' ? 'Yanlış' : 'Boş'}</label>
-                                    <input 
-                                        type="number" 
-                                        className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
-                                        value={summaryStats[type as keyof typeof summaryStats]}
-                                        onChange={(e) => setSummaryStats(prev => ({...prev, [type]: e.target.value}))}
-                                        placeholder="0"
-                                    />
-                                </div>
+                        {/* Correct */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-green-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
+                            <div className="bg-white dark:bg-slate-800 border-2 border-green-100 dark:border-green-900/30 group-focus-within:border-green-500 rounded-2xl p-3 text-center transition-all">
+                                <label className="block text-green-600 dark:text-green-400 text-[10px] font-bold uppercase mb-1">Doğru</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    value={summaryStats.correct}
+                                    onChange={(e) => setSummaryStats(prev => ({...prev, correct: e.target.value}))}
+                                    placeholder="0"
+                                />
                             </div>
-                        ))}
+                        </div>
+
+                        {/* Incorrect */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-red-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
+                            <div className="bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900/30 group-focus-within:border-red-500 rounded-2xl p-3 text-center transition-all">
+                                <label className="block text-red-600 dark:text-red-400 text-[10px] font-bold uppercase mb-1">Yanlış</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    value={summaryStats.incorrect}
+                                    onChange={(e) => setSummaryStats(prev => ({...prev, incorrect: e.target.value}))}
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Empty */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-slate-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
+                            <div className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 group-focus-within:border-slate-400 rounded-2xl p-3 text-center transition-all">
+                                <label className="block text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase mb-1">Boş</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    value={summaryStats.empty}
+                                    onChange={(e) => setSummaryStats(prev => ({...prev, empty: e.target.value}))}
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
                     </div>
+
+                    {/* Net Result Bar */}
                     {totalQs > 0 && (
                         <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                             <span className="text-xs font-bold text-slate-500 uppercase">Toplam Net</span>
@@ -304,24 +248,36 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
                     )}
                 </div>
 
+                {/* Linked Task Toggle */}
                 {activeSession.linkedTaskId && (
-                    <div onClick={() => setMarkTaskCompleted(!markTaskCompleted)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all mb-6 text-left ${markTaskCompleted ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                        <div className={`p-1 rounded-full ${markTaskCompleted ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-400'}`}><Check size={14} strokeWidth={3} /></div>
+                    <div 
+                        onClick={() => setMarkTaskCompleted(!markTaskCompleted)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all mb-6 text-left ${markTaskCompleted ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                    >
+                        <div className={`p-1 rounded-full ${markTaskCompleted ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                            <Check size={14} strokeWidth={3} />
+                        </div>
                         <div className="flex-1">
                             <p className={`text-sm font-bold ${markTaskCompleted ? 'text-green-700 dark:text-green-300' : 'text-slate-600 dark:text-slate-400'}`}>Bağlı Görevi Tamamla</p>
+                            <p className="text-[10px] text-slate-400">Bu çalışma bir göreve bağlıydı.</p>
                         </div>
                     </div>
                 )}
 
-                <button onClick={handleFinish} className="w-full py-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-2xl font-bold shadow-xl flex items-center justify-center gap-2 text-lg transition-all">
+                {/* Action Buttons */}
+                <button 
+                    onClick={handleFinish} 
+                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-2xl font-bold shadow-xl shadow-slate-900/20 active:scale-98 transition-all flex items-center justify-center gap-2 text-lg"
+                >
                     <CheckCircle2 size={20} /> Kaydet ve Çık
                 </button>
+
             </div>
         </div>
     );
 };
 
-// --- Modals Wrapper (Memoized) ---
+// --- Modals Wrapper ---
 const Modals = React.memo(({ 
     isTestModalOpen, setIsTestModalOpen, 
     isStopConfirmOpen, setIsStopConfirmOpen, 
@@ -330,17 +286,27 @@ const Modals = React.memo(({
     isManualLogOpen, setIsManualLogOpen,
     activeSession, subjects, confirmStopSession, updateTopic, addTestLog, addTask, logManualSession
 }: any) => {
+    // UPDATED: Removed totalQuestions, logic now sums inputs
     const [testForm, setTestForm] = useState({ name: '', subjectId: '', topic: '', correct: '', incorrect: '', empty: '', note: '' });
     const [tempTopic, setTempTopic] = useState('');
     const [quickTaskTitle, setQuickTaskTitle] = useState('');
     const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>('medium');
-    const [manualForm, setManualForm] = useState({ subjectId: subjects[0]?.id || '', topic: '', duration: '', correct: '', incorrect: '', empty: '' });
+    const [manualForm, setManualForm] = useState({ 
+        subjectId: subjects[0]?.id || '', 
+        topic: '', 
+        duration: '', 
+        correct: '', 
+        incorrect: '', 
+        empty: '',
+        date: new Date().toISOString().split('T')[0] // Default to today YYYY-MM-DD
+    });
 
     useEffect(() => {
         if (isTestModalOpen && activeSession) setTestForm(prev => ({ ...prev, subjectId: activeSession.subjectId, topic: activeSession.topic }));
         if (isEditTopicOpen && activeSession) setTempTopic(activeSession.topic);
     }, [isTestModalOpen, isEditTopicOpen, activeSession]);
     
+    // Manual Log subject update fix
     useEffect(() => {
         if (isManualLogOpen && !manualForm.subjectId && subjects.length > 0) {
             setManualForm(prev => ({ ...prev, subjectId: subjects[0].id }));
@@ -370,47 +336,75 @@ const Modals = React.memo(({
 
     const handleManualLog = () => {
         if (!manualForm.topic.trim()) return;
+        const logDate = manualForm.date ? new Date(manualForm.date) : new Date();
         logManualSession(
             manualForm.subjectId, manualForm.topic.trim(), parseInt(manualForm.duration) || 0,
-            { correct: parseInt(manualForm.correct) || 0, incorrect: parseInt(manualForm.incorrect) || 0, empty: parseInt(manualForm.empty) || 0 }
+            { correct: parseInt(manualForm.correct) || 0, incorrect: parseInt(manualForm.incorrect) || 0, empty: parseInt(manualForm.empty) || 0 },
+            logDate
         );
-        setManualForm({ subjectId: subjects[0]?.id || '', topic: '', duration: '', correct: '', incorrect: '', empty: '' });
+        // Reset form except Subject (user might log multiple for same subject)
+        setManualForm(prev => ({ ...prev, topic: '', duration: '', correct: '', incorrect: '', empty: '' }));
         setIsManualLogOpen(false);
     };
 
     return (
         <>
+            {/* UPDATED TEST MODAL: Modern & Simplified */}
             {isTestModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4 animate-fade-in">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800 animate-slide-up space-y-5 relative">
                         <button onClick={()=>setIsTestModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><XCircle size={24}/></button>
+                        
                         <div className="flex items-center gap-3">
                              <div className="p-2 bg-primary/10 rounded-lg text-primary"><FilePlus2 size={24}/></div>
                              <h3 className="font-bold text-xl dark:text-white">Test Sonucu</h3>
                         </div>
+
                         <input 
-                            type="text" placeholder="Test Adı / Kaynak" 
+                            type="text" 
+                            placeholder="Test Adı / Kaynak (Örn: 3D Yayınları)" 
                             className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white focus:border-primary focus:outline-none font-medium" 
-                            value={testForm.name} onChange={e=>setTestForm({...testForm, name: e.target.value})} autoFocus
+                            value={testForm.name} 
+                            onChange={e=>setTestForm({...testForm, name: e.target.value})} 
+                            autoFocus
                         />
+                        
                         <div className="grid grid-cols-3 gap-3">
-                             {['correct', 'incorrect', 'empty'].map(type => (
-                                 <div key={type} className="space-y-1">
-                                     <label className="text-[10px] uppercase font-bold text-center block opacity-60">{type === 'correct' ? 'Doğru' : type === 'incorrect' ? 'Yanlış' : 'Boş'}</label>
-                                     <input type="number" 
-                                        className={`w-full p-3 rounded-xl border text-center font-bold text-lg focus:outline-none ${type==='correct'?'bg-green-50 text-green-600 border-green-100':'bg-slate-50 text-slate-600 border-slate-200'}`} 
-                                        value={testForm[type as keyof typeof testForm]} 
-                                        onChange={e=>setTestForm({...testForm, [type]: e.target.value})}
-                                     />
-                                 </div>
-                             ))}
+                             <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-green-600 block text-center">Doğru</label>
+                                <input type="number" className="w-full p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 text-center font-bold text-lg text-green-600 focus:outline-none focus:ring-2 focus:ring-green-500/50" value={testForm.correct} onChange={e=>setTestForm({...testForm, correct: e.target.value})}/>
+                             </div>
+                             <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-red-600 block text-center">Yanlış</label>
+                                <input type="number" className="w-full p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-center font-bold text-lg text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50" value={testForm.incorrect} onChange={e=>setTestForm({...testForm, incorrect: e.target.value})}/>
+                             </div>
+                             <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-slate-400 block text-center">Boş</label>
+                                <input type="number" className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold text-lg text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400/50" value={testForm.empty} onChange={e=>setTestForm({...testForm, empty: e.target.value})}/>
+                             </div>
                         </div>
-                        <button onClick={handleAddTest} className="w-full py-3.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">Sonucu Kaydet</button>
+
+                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 flex justify-between items-center border border-slate-100 dark:border-slate-700">
+                             <span className="text-xs font-bold text-slate-400 uppercase">Toplam Soru</span>
+                             <span className="text-lg font-bold text-slate-800 dark:text-white">
+                                 {(parseInt(testForm.correct)||0) + (parseInt(testForm.incorrect)||0) + (parseInt(testForm.empty)||0)}
+                             </span>
+                        </div>
+
+                        <input 
+                            type="text" 
+                            placeholder="Kısa bir not ekle..." 
+                            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white text-sm focus:border-primary focus:outline-none" 
+                            value={testForm.note} 
+                            onChange={e=>setTestForm({...testForm, note: e.target.value})}
+                        />
+                        
+                        <button onClick={handleAddTest} className="w-full py-3.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">
+                            Sonucu Kaydet
+                        </button>
                     </div>
                 </div>
             )}
-            
-            {/* ... Other modals (EditTopic, StopConfirm, QuickTask, ManualLog) follow same pattern ... */}
             {isEditTopicOpen && (
                  <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4 animate-fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-up border border-slate-200 dark:border-slate-700">
@@ -441,7 +435,7 @@ const Modals = React.memo(({
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-slide-up border border-slate-200 dark:border-slate-700">
                         <h3 className="font-bold text-lg dark:text-white mb-4">Hızlı Görev Ekle</h3>
                         <input type="text" placeholder="Görev adı..." className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white mb-4 focus:border-primary focus:outline-none" value={quickTaskTitle} onChange={(e) => setQuickTaskTitle(e.target.value)} autoFocus />
-                        <div className="flex gap-2 mb-6">
+                         <div className="flex gap-2 mb-6">
                             {(['low', 'medium', 'high'] as TaskPriority[]).map(p => (
                                 <button key={p} onClick={() => setQuickTaskPriority(p)} className={`flex-1 py-2 rounded-lg text-xs font-bold border transition-all ${quickTaskPriority===p ? (p==='high'?'bg-red-500 text-white border-red-500':p==='medium'?'bg-yellow-500 text-white border-yellow-500':'bg-blue-500 text-white border-blue-500') : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'}`}>
                                     {p === 'high' ? 'Yüksek' : p === 'medium' ? 'Orta' : 'Düşük'}
@@ -455,24 +449,156 @@ const Modals = React.memo(({
                     </div>
                 </div>
             )}
+            
+            {/* REDESIGNED MANUAL LOG MODAL */}
             {isManualLogOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4 animate-fade-in">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl p-6 animate-slide-up space-y-4 max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-700 relative">
-                        <button onClick={()=>setIsManualLogOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><XCircle size={24}/></button>
-                        <h3 className="font-bold text-lg dark:text-white">Manuel Çalışma Kaydı</h3>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-400 uppercase">Ders Seçimi</label>
-                            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-                                {subjects.map((s:any) => (
-                                    <button key={s.id} onClick={()=>setManualForm({...manualForm, subjectId: s.id})} className={`px-3 py-1.5 rounded-lg border whitespace-nowrap text-sm font-medium transition-colors ${manualForm.subjectId===s.id ? 'bg-primary text-white border-primary' : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                        {s.name}
-                                    </button>
-                                ))}
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl shadow-2xl p-6 md:p-8 animate-slide-up max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 relative">
+                        {/* Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl text-white shadow-lg shadow-blue-500/20">
+                                    <ClipboardEdit size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-xl dark:text-white">Çalışma Ekle</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Manuel veri girişi</p>
+                                </div>
+                            </div>
+                            <button onClick={()=>setIsManualLogOpen(false)} className="text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 p-2 rounded-full">
+                                <X size={20}/>
+                            </button>
+                        </div>
+
+                        {/* Subject Selector (Visual Strip) */}
+                        <div className="mb-6">
+                            <label className="text-xs font-bold text-slate-400 uppercase mb-2 block px-1">Ders Seçimi</label>
+                            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar snap-x">
+                                {subjects.map((s: Subject) => {
+                                    const isSelected = manualForm.subjectId === s.id;
+                                    // Extract color name for background utility (e.g. bg-blue-500 -> blue)
+                                    const colorBase = s.color?.split('-')[1] || 'blue'; 
+                                    return (
+                                        <button 
+                                            key={s.id} 
+                                            onClick={()=>setManualForm({...manualForm, subjectId: s.id})} 
+                                            className={`snap-start shrink-0 px-4 py-3 rounded-2xl border transition-all flex flex-col items-center gap-1 min-w-[90px] ${
+                                                isSelected 
+                                                ? `bg-${colorBase}-50 dark:bg-${colorBase}-900/20 border-${colorBase}-500 ring-1 ring-${colorBase}-500 text-${colorBase}-600 dark:text-${colorBase}-400` 
+                                                : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                            }`}
+                                        >
+                                            <span className="font-bold text-sm truncate w-full text-center">{s.name}</span>
+                                            {isSelected && <div className={`w-1.5 h-1.5 rounded-full bg-${colorBase}-500 mt-1`}></div>}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
-                        <input type="text" placeholder="Konu başlığı..." className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white focus:border-primary focus:outline-none" value={manualForm.topic} onChange={e=>setManualForm({...manualForm, topic: e.target.value})}/>
-                        <input type="number" placeholder="Süre (Dakika)" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white focus:border-primary focus:outline-none" value={manualForm.duration} onChange={e=>setManualForm({...manualForm, duration: e.target.value})}/>
-                        <button onClick={handleManualLog} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 transition-all mt-4">Kaydet</button>
+
+                        {/* Topic & Date Row */}
+                        <div className="grid grid-cols-3 gap-4 mb-6">
+                            <div className="col-span-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block px-1">Konu Başlığı</label>
+                                <div className="relative group">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Örn: Limit ve Süreklilik" 
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all font-medium" 
+                                        value={manualForm.topic} 
+                                        onChange={e=>setManualForm({...manualForm, topic: e.target.value})}
+                                    />
+                                    <StickyNote size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"/>
+                                </div>
+                            </div>
+                            <div className="col-span-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block px-1">Tarih</label>
+                                <div className="relative group">
+                                    <input 
+                                        type="date" 
+                                        className="w-full pl-2 pr-2 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all text-xs font-bold text-center" 
+                                        value={manualForm.date}
+                                        onChange={e=>setManualForm({...manualForm, date: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Duration Section with Quick Presets */}
+                        <div className="mb-6">
+                            <div className="flex justify-between items-center mb-2 px-1">
+                                <label className="text-xs font-bold text-slate-400 uppercase">Süre (Dakika)</label>
+                                <div className="flex gap-2">
+                                    {[30, 45, 60].map(m => (
+                                        <button 
+                                            key={m}
+                                            onClick={() => setManualForm({...manualForm, duration: m.toString()})}
+                                            className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                        >
+                                            {m}dk
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="relative group">
+                                <input 
+                                    type="number" 
+                                    placeholder="0" 
+                                    className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all font-bold" 
+                                    value={manualForm.duration} 
+                                    onChange={e=>setManualForm({...manualForm, duration: e.target.value})}
+                                />
+                                <Clock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"/>
+                            </div>
+                        </div>
+                        
+                        {/* Stats Cards (Gamified) */}
+                        <div className="mb-8">
+                             <label className="text-xs font-bold text-slate-400 uppercase mb-3 block px-1">Soru İstatistikleri (Opsiyonel)</label>
+                             <div className="grid grid-cols-3 gap-3">
+                                 {/* Correct */}
+                                 <div className="bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 rounded-2xl p-3 flex flex-col items-center justify-center focus-within:ring-2 ring-green-500 transition-all">
+                                     <span className="text-xs font-bold text-green-600 dark:text-green-400 uppercase mb-1">Doğru</span>
+                                     <input 
+                                        type="number" 
+                                        placeholder="0" 
+                                        className="w-full text-center bg-transparent text-2xl font-bold text-green-700 dark:text-green-400 focus:outline-none placeholder-green-700/30 dark:placeholder-green-400/30" 
+                                        value={manualForm.correct} 
+                                        onChange={e=>setManualForm({...manualForm, correct: e.target.value})}
+                                     />
+                                 </div>
+                                 {/* Incorrect */}
+                                 <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-3 flex flex-col items-center justify-center focus-within:ring-2 ring-red-500 transition-all">
+                                     <span className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-1">Yanlış</span>
+                                     <input 
+                                        type="number" 
+                                        placeholder="0" 
+                                        className="w-full text-center bg-transparent text-2xl font-bold text-red-700 dark:text-red-400 focus:outline-none placeholder-red-700/30 dark:placeholder-red-400/30" 
+                                        value={manualForm.incorrect} 
+                                        onChange={e=>setManualForm({...manualForm, incorrect: e.target.value})}
+                                     />
+                                 </div>
+                                 {/* Empty */}
+                                 <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-3 flex flex-col items-center justify-center focus-within:ring-2 ring-slate-400 transition-all">
+                                     <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Boş</span>
+                                     <input 
+                                        type="number" 
+                                        placeholder="0" 
+                                        className="w-full text-center bg-transparent text-2xl font-bold text-slate-700 dark:text-slate-300 focus:outline-none placeholder-slate-400/50" 
+                                        value={manualForm.empty} 
+                                        onChange={e=>setManualForm({...manualForm, empty: e.target.value})}
+                                     />
+                                 </div>
+                            </div>
+                        </div>
+                        
+                        {/* Footer Buttons */}
+                        <div className="flex gap-3">
+                            <button onClick={()=>setIsManualLogOpen(false)} className="px-6 py-4 rounded-xl text-slate-500 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Vazgeç</button>
+                            <button onClick={handleManualLog} className="flex-1 py-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-xl font-bold shadow-xl shadow-slate-900/20 active:scale-98 transition-all flex items-center justify-center gap-2 text-lg">
+                                <CheckCircle2 size={20} /> Kaydet
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -486,11 +612,13 @@ const Modals = React.memo(({
 interface DashboardProps { onChangeView: (view: ViewState) => void; }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
+  // Use Study for static data, Timer for dynamic data
   const { history, subjects, toggleTask, settings, toggleSettings, addTask, logManualSession } = useStudy();
+  
   const { 
-      activeSession, stopSession, finishSession, 
-      updateQuestionStats, addTestLog, removeTestLog,
-      updateActiveSessionNote, updateActiveSessionTopic
+      activeSession, pauseSession, resumeSession, stopSession, finishSession, restartSession, 
+      formatTime, updateQuestionStats, addTestLog, removeTestLog,
+      updateActiveSessionNote, updateActiveSessionTopic, adjustActiveSessionTime
   } = useTimer();
 
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
@@ -500,7 +628,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
   const [isManualLogOpen, setIsManualLogOpen] = useState(false); 
   const [isZenMode, setIsZenMode] = useState(false);
 
-  // --- Calculations (Memoized for Overview) ---
+  // --- Calculations ---
 
   const greeting = useMemo(() => {
       const hour = new Date().getHours();
@@ -538,6 +666,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
           const db = new Date(b.split('.').reverse().join('-'));
           return db.getTime() - da.getTime();
       });
+      
       const today = new Date().toLocaleDateString('tr-TR');
       const yesterdayDate = new Date(); yesterdayDate.setDate(yesterdayDate.getDate() - 1);
       const yesterday = yesterdayDate.toLocaleDateString('tr-TR');
@@ -546,6 +675,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
 
       let count = 1;
       let checkDate = new Date(uniqueDates[0].split('.').reverse().join('-'));
+      
       for(let i=1; i<uniqueDates.length; i++) {
           checkDate.setDate(checkDate.getDate() - 1);
           if (uniqueDates[i] === checkDate.toLocaleDateString('tr-TR')) count++;
@@ -564,9 +694,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
       return history.filter(h => h.timestamp >= monday.getTime()).reduce((acc, curr) => acc + curr.durationMinutes, 0);
   }, [history]);
 
+  // Goal Progress
   const goalPercentage = settings.weeklyGoalMinutes > 0 
     ? Math.min(100, Math.round((weeklyMinutes / settings.weeklyGoalMinutes) * 100)) 
     : 0;
+    
+  // Fixed Ring Geometry for 160x160 Box
+  const ringRadius = 70; // r=70 fits in 160 with 10px stroke (70+5=75, center 80, 5px margin)
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const ringOffset = ringCircumference - (goalPercentage / 100) * ringCircumference;
+
+  // Circle Progress (Active Session)
+  const isInfiniteStopwatch = activeSession?.mode === 'stopwatch' && activeSession?.totalDuration === 0;
+  
+  // GAUGE LOGIC
+  const TOTAL_TICKS = 60; // Like a clock
+  const activeTicks = useMemo(() => {
+      if (!activeSession) return 0;
+      if (isInfiniteStopwatch) {
+          // Animated spinning effect simulation or seconds based
+          // OLD: return (activeSession.timeLeft % 60); 
+          // NEW: Rotate over 1 hour (60 minutes) instead of 1 minute (60 seconds)
+          // We floor the seconds to get minutes, then mod 60 for the ring position.
+          return Math.floor(activeSession.timeLeft / 60) % 60; 
+      }
+      // Calculate remaining percentage
+      const total = activeSession.totalDuration;
+      const left = activeSession.timeLeft;
+      const fraction = (total - left) / total;
+      return Math.floor(fraction * TOTAL_TICKS);
+  }, [activeSession?.timeLeft, activeSession?.totalDuration, isInfiniteStopwatch]);
 
 
   // --- Render Views ---
@@ -575,11 +732,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
       return <SessionSummary activeSession={activeSession} finishSession={finishSession} toggleTask={toggleTask} />;
   }
 
-  // Active Session View (High Update Frequency)
   if (activeSession) {
       const containerClasses = isZenMode 
         ? "fixed inset-0 z-50 bg-slate-900 flex items-center justify-center p-4 animate-fade-in" 
         : "space-y-6 animate-slide-up relative";
+
+      // Calculate Net for Live View
+      const currentNet = activeSession.stats.correct - (activeSession.stats.incorrect * 0.25);
+      const totalQs = activeSession.stats.correct + activeSession.stats.incorrect + activeSession.stats.empty;
+      const currentAccuracy = totalQs > 0 ? Math.round((activeSession.stats.correct / totalQs) * 100) : 0;
 
       return (
         <div className={containerClasses}>
@@ -610,20 +771,171 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
 
           <div className={`grid grid-cols-1 ${isZenMode ? 'w-full max-w-4xl' : 'lg:grid-cols-3'} gap-6`}>
             
-            {/* Timer Cockpit (Isolated Component) */}
-            <TimerDisplay 
-                activeSession={activeSession} 
-                isZenMode={isZenMode}
-                setIsEditTopicOpen={setIsEditTopicOpen}
-                setIsStopConfirmOpen={setIsStopConfirmOpen}
-            />
+            {/* --- NEW MODERN TIMER COCKPIT (GAUGE STYLE) --- */}
+            <div className={`
+                ${isZenMode ? 'w-full aspect-square flex items-center justify-center' : 'lg:col-span-2'} 
+                bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 md:p-12 shadow-sm flex flex-col items-center justify-between relative overflow-hidden transition-all duration-500
+            `}>
+                {/* Top Info */}
+                <div className="z-10 text-center cursor-pointer hover:opacity-80 transition-opacity mb-4" onClick={() => setIsEditTopicOpen(true)}>
+                    <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2">
+                        {subjects.find(s=>s.id === activeSession.subjectId)?.name || 'Ders'}
+                    </div>
+                    <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white flex items-center justify-center gap-2">
+                        {activeSession.topic} <PenLine size={18} className="text-primary opacity-50"/>
+                    </div>
+                </div>
+
+                {/* The Gauge Clock Visual */}
+                <div className="relative flex-1 flex items-center justify-center w-full max-w-[400px] aspect-square my-4">
+                    <svg className="w-full h-full" viewBox="0 0 400 400">
+                        <defs>
+                             {/* REMOVED: Rainbow Gradient. Using solid colors per user request */}
+                            <filter id="needleGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                                <feMerge>
+                                    <feMergeNode in="coloredBlur" />
+                                    <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                            </filter>
+                        </defs>
+                        
+                        {/* 1. Background Ticks (Gray) */}
+                        {Array.from({ length: TOTAL_TICKS }).map((_, i) => {
+                            const angle = (i * 6) - 90; // Start from top (-90 deg)
+                            const isMajor = i % 5 === 0;
+                            // Math for ticks
+                            const rad = angle * (Math.PI / 180);
+                            const outerR = 160;
+                            const innerR = isMajor ? 140 : 145;
+                            const x1 = 200 + innerR * Math.cos(rad);
+                            const y1 = 200 + innerR * Math.sin(rad);
+                            const x2 = 200 + outerR * Math.cos(rad);
+                            const y2 = 200 + outerR * Math.sin(rad);
+
+                            return (
+                                <line 
+                                    key={`bg-${i}`} 
+                                    x1={x1} y1={y1} x2={x2} y2={y2} 
+                                    stroke="currentColor" 
+                                    strokeWidth={isMajor ? 2 : 1}
+                                    className="text-slate-200 dark:text-slate-700/50"
+                                />
+                            );
+                        })}
+
+                        {/* 2. Active Ticks (Solid Blue) */}
+                        {Array.from({ length: activeTicks }).map((_, i) => {
+                            const angle = (i * 6) - 90;
+                            const isMajor = i % 5 === 0;
+                            const rad = angle * (Math.PI / 180);
+                            const outerR = 160;
+                            const innerR = isMajor ? 140 : 145;
+                            const x1 = 200 + innerR * Math.cos(rad);
+                            const y1 = 200 + innerR * Math.sin(rad);
+                            const x2 = 200 + outerR * Math.cos(rad);
+                            const y2 = 200 + outerR * Math.sin(rad);
+
+                            return (
+                                <line 
+                                    key={`active-${i}`} 
+                                    x1={x1} y1={y1} x2={x2} y2={y2} 
+                                    stroke="var(--color-primary)" 
+                                    strokeWidth={isMajor ? 3 : 2}
+                                    strokeLinecap="round"
+                                />
+                            );
+                        })}
+
+                        {/* 3. The Needle / Indicator (Current Position) - Simple Blue */}
+                        {(() => {
+                            // Needle Position
+                            const currentTickIndex = activeTicks > 0 ? activeTicks - 1 : 0;
+                            const angle = (currentTickIndex * 6) - 90;
+                            const rad = angle * (Math.PI / 180);
+                            // Make needle distinct
+                            const needleInner = 135; 
+                            const needleOuter = 165;
+                            const nx1 = 200 + needleInner * Math.cos(rad);
+                            const ny1 = 200 + needleInner * Math.sin(rad);
+                            const nx2 = 200 + needleOuter * Math.cos(rad);
+                            const ny2 = 200 + needleOuter * Math.sin(rad);
+                            
+                            return (
+                                <line 
+                                    x1={nx1} y1={ny1} x2={nx2} y2={ny2}
+                                    stroke="var(--color-primary)"
+                                    strokeWidth="4"
+                                    strokeLinecap="round"
+                                    filter="url(#needleGlow)"
+                                    className="transition-all duration-300 ease-out"
+                                />
+                            );
+                        })()}
+
+                        {/* Decorative Inner Circle Text Track */}
+                        <circle cx="200" cy="200" r="120" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" className="text-slate-100 dark:text-slate-800 opacity-50" />
+                    </svg>
+                    
+                    {/* Time Display */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-6xl sm:text-7xl md:text-8xl font-light text-slate-800 dark:text-white font-mono tracking-tighter tabular-nums drop-shadow-lg">
+                            {formatTime(activeSession.timeLeft)}
+                        </span>
+                        
+                        {activeSession.isPaused ? (
+                            <div className="mt-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/50 text-yellow-500 font-bold text-xs animate-pulse flex items-center gap-1">
+                                <Pause size={12} fill="currentColor"/> Duraklatıldı
+                            </div>
+                        ) : (
+                             <div className="mt-2 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 font-bold text-xs flex items-center gap-1">
+                                {activeSession.mode === 'stopwatch' ? 'Kronometre' : 'Kalan Süre'}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center gap-4 z-10 w-full justify-center max-w-lg mt-4">
+                    <button onClick={() => setIsStopConfirmOpen(true)} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95" title="İptal Et (Çöp)"><Trash2 size={24}/></button>
+                    
+                    <button onClick={activeSession.isPaused ? resumeSession : pauseSession} className="flex-1 py-4 rounded-2xl bg-primary text-white font-bold text-xl flex items-center justify-center gap-3 shadow-xl shadow-primary/30 hover:brightness-110 active:scale-95 transition-all">
+                        {activeSession.isPaused ? <Play size={24} fill="currentColor" /> : <Pause size={24} fill="currentColor" />}
+                        <span>{activeSession.isPaused ? 'Devam Et' : 'Duraklat'}</span>
+                    </button>
+                    
+                    {/* NEW: Finish Button */}
+                    <button onClick={() => finishSession()} className="p-4 rounded-2xl bg-green-500 text-white hover:bg-green-600 transition-all active:scale-95 shadow-lg shadow-green-500/20" title="Bitir ve Kaydet"><Check size={24} strokeWidth={3} /></button>
+                </div>
+            </div>
 
             {/* Right Stats Column - Modernized */}
             {!isZenMode && (
             <div className="flex flex-col gap-6 h-full">
                 
-                {/* 1. Live Stats Panel (Memoized) */}
-                <LiveStatsPanel stats={activeSession.stats} updateQuestionStats={updateQuestionStats} />
+                {/* 1. Live Stats Panel */}
+                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex-1 flex flex-col relative overflow-hidden">
+                    {/* Header with Live Indicator */}
+                    <div className="flex items-center justify-between mb-6">
+                        <SectionHeader title="Canlı İstatistik" icon={BarChart3} />
+                        <div className="flex items-center gap-2">
+                             <div className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center gap-1.5 border border-slate-200 dark:border-slate-600">
+                                <Calculator size={14} className="text-blue-500"/>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Net: {currentNet}</span>
+                             </div>
+                             <div className={`px-3 py-1 rounded-lg flex items-center gap-1.5 border ${currentAccuracy >= 50 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500'}`}>
+                                <Percent size={14} />
+                                <span className="text-xs font-bold">{currentAccuracy}%</span>
+                             </div>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-3 flex-1">
+                        <LiveStatRow label="Doğru" value={activeSession.stats.correct} type="correct" onUpdate={(n) => updateQuestionStats('correct', n)} />
+                        <LiveStatRow label="Yanlış" value={activeSession.stats.incorrect} type="incorrect" onUpdate={(n) => updateQuestionStats('incorrect', n)} />
+                        <LiveStatRow label="Boş" value={activeSession.stats.empty} type="empty" onUpdate={(n) => updateQuestionStats('empty', n)} />
+                    </div>
+                </div>
                 
                 {/* 2. Tools Panel (Notes & Test Add) */}
                 <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
@@ -656,7 +968,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                                 <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{activeSession.logs.length}</span>
                              </div>
                              <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
-                                {activeSession.logs.map((log: any) => (
+                                {activeSession.logs.map(log => (
                                     <div key={log.id} className="group flex justify-between items-center text-xs p-3 bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600 transition-all shadow-sm">
                                         <div className="flex flex-col truncate pr-2">
                                             <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{log.name}</span>
@@ -683,7 +995,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
       );
   }
 
-  // --- DASHBOARD OVERVIEW (Low Update Frequency) ---
+  // --- DASHBOARD (Main View) ---
   return (
     <div className="space-y-6 pb-24 animate-slide-up">
          <Modals 
@@ -692,10 +1004,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
             addTask={addTask} 
             subjects={subjects}
             logManualSession={logManualSession}
-            activeSession={null} 
+            activeSession={null} // Main view has no active session context passed this way
          />
          
-         {/* 1. Header */}
+         {/* 1. Header: Greeting & Primary Action */}
          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
              <div>
                  <h1 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">{greeting}</h1>
@@ -711,7 +1023,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
              </div>
          </div>
 
-         {/* 2. Stats Grid */}
+         {/* 2. Stats Grid (Clean & Consistent) */}
          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
              <StatCard title="Seri (Gün)" value={streak} icon={Flame} colorClass="text-orange-500 bg-orange-500" />
              <StatCard title="Bugün (Dk)" value={Math.floor(todayStats.minutes)} icon={Clock} colorClass="text-blue-500 bg-blue-500" />
@@ -719,22 +1031,83 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
              <StatCard title="Oturum" value={todayStats.count} icon={ListTodo} colorClass="text-purple-500 bg-purple-500" />
          </div>
 
-         {/* 3. Main Visuals */}
+         {/* 3. Main Visuals: Activity Chart & Weekly Goal */}
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-             {/* Left: Activity Area Chart (Memoized) */}
-             <WeeklyActivityChart data={weeklyData} weeklyMinutes={weeklyMinutes} />
+             {/* Left: Activity Area Chart */}
+             <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                 <div className="flex justify-between items-center mb-6">
+                    <SectionHeader title="Haftalık Aktivite" icon={BarChart3} />
+                    <span className="text-2xl font-bold text-slate-900 dark:text-white">
+                        {Math.floor(weeklyMinutes / 60)}<span className="text-sm font-normal text-slate-400">sa</span> {weeklyMinutes % 60}<span className="text-sm font-normal text-slate-400">dk</span>
+                    </span>
+                 </div>
+                 <div className="h-64 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={weeklyData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="colorWeekly" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.2}/>
+                                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 11}} dy={10} />
+                            <Tooltip content={<CustomTooltip />} cursor={{stroke: 'var(--color-primary)', strokeWidth: 1}} />
+                            <Area 
+                                type="monotone" 
+                                dataKey="value" 
+                                stroke="var(--color-primary)" 
+                                strokeWidth={2} 
+                                fill="url(#colorWeekly)" 
+                            />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                 </div>
+             </div>
 
-             {/* Right: Weekly Goal Ring (Memoized) */}
-             <WeeklyGoalRing percentage={goalPercentage} goalMinutes={settings.weeklyGoalMinutes} toggleSettings={toggleSettings} />
+             {/* Right: Weekly Goal Ring */}
+             <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex flex-col items-center justify-center relative">
+                 <div className="w-full flex justify-between items-center absolute top-6 px-6">
+                     <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Haftalık Hedef</span>
+                     <button onClick={toggleSettings} className="text-xs text-primary font-bold hover:underline">Düzenle</button>
+                 </div>
+                 
+                 <div className="relative mt-4 flex items-center justify-center">
+                     <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 160 160">
+                         {/* Background Track */}
+                         <circle 
+                            cx="80" cy="80" r={ringRadius} 
+                            stroke="currentColor" 
+                            strokeWidth="12" 
+                            fill="transparent" 
+                            className="text-slate-100 dark:text-slate-700" 
+                         />
+                         {/* Progress Ring with Glow */}
+                         <circle 
+                            cx="80" cy="80" r={ringRadius} 
+                            stroke="var(--color-primary)" 
+                            strokeWidth="12" 
+                            fill="transparent" 
+                            strokeDasharray={ringCircumference} 
+                            strokeDashoffset={ringOffset} 
+                            strokeLinecap="round"
+                            className="transition-all duration-1000 ease-out neon-stroke"
+                         />
+                     </svg>
+                     <div className="absolute inset-0 flex flex-col items-center justify-center">
+                         <span className="text-3xl font-bold text-slate-900 dark:text-white">%{goalPercentage}</span>
+                     </div>
+                 </div>
+                 <p className="mt-4 text-sm text-slate-500">
+                    <span className="font-bold text-slate-700 dark:text-slate-300">{Math.floor(settings.weeklyGoalMinutes/60)} saat</span> hedefine ulaşmak için çalışmaya devam et.
+                 </p>
+             </div>
          </div>
 
-         {/* 4. Recent Activity */}
+         {/* 4. Recent Activity (Same Style as Tasks/History) */}
          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
              <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/20">
-                 <div className="flex items-center gap-2">
-                    <History size={18} className="text-primary" />
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide">Son Aktiviteler</h3>
-                 </div>
+                 <SectionHeader title="Son Aktiviteler" icon={History} />
              </div>
              <div>
                 {history.slice(0, 3).length > 0 ? (
@@ -770,7 +1143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
              )}
          </div>
          
-         {/* FAB Mobile */}
+         {/* FAB Mobile - Only for quick task to keep it clean */}
          <button 
             onClick={() => setIsQuickTaskOpen(true)}
             className="fixed bottom-24 right-6 w-12 h-12 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform z-40 md:hidden"

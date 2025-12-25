@@ -58,12 +58,8 @@ const History: React.FC = () => {
         // 3. Status Filter
         if (filters.status !== 'all' && item.status !== filters.status) return false;
 
-        // 4. Date Filter (Format Conversion: YYYY-MM-DD -> DD.MM.YYYY)
-        if (filters.date) {
-            const [y, m, d] = filters.date.split('-');
-            const formattedFilterDate = `${d}.${m}.${y}`;
-            if (item.date !== formattedFilterDate) return false;
-        }
+        // 4. Date Filter (Exact Match)
+        if (filters.date && item.date !== filters.date) return false;
 
         // 5. Duration Filter
         if (filters.duration !== 'all') {
@@ -218,19 +214,6 @@ const History: React.FC = () => {
                       </div>
                   </div>
 
-                  {/* Date Filter */}
-                  <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Tarih</label>
-                      <div className="relative">
-                          <input 
-                            type="date"
-                            value={filters.date || ''}
-                            onChange={(e) => setFilters({...filters, date: e.target.value || null})}
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                          />
-                      </div>
-                  </div>
-
                   {/* Status Filter */}
                   <div className="space-y-1">
                       <label className="text-xs font-bold text-slate-400 uppercase">Durum</label>
@@ -261,6 +244,23 @@ const History: React.FC = () => {
                               <option value="short">Kısa (&lt; 20dk)</option>
                               <option value="medium">Orta (20-60dk)</option>
                               <option value="long">Uzun (&gt; 60dk)</option>
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                      </div>
+                  </div>
+
+                  {/* Sort Key */}
+                   <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-400 uppercase">Sıralama Kriteri</label>
+                      <div className="relative">
+                          <select 
+                            value={sortConfig.key}
+                            onChange={(e) => setSortConfig({...sortConfig, key: e.target.value as any})}
+                            className="w-full appearance-none bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg pl-3 pr-8 py-2 text-sm text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          >
+                              <option value="date">Tarih</option>
+                              <option value="duration">Süre</option>
+                              <option value="efficiency">Verimlilik</option>
                           </select>
                           <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                       </div>
