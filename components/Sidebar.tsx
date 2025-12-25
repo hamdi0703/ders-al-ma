@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   LayoutDashboard, 
   PlusCircle, 
@@ -30,6 +30,18 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onOpenSett
   
   // Check if running in standalone mode (installed PWA)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+  // Lock Body Scroll when Mobile Menu is Open
+  useEffect(() => {
+    if (isMobileOpen) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = 'unset';
+    }
+    return () => {
+        document.body.style.overflow = 'unset';
+    };
+  }, [isMobileOpen]);
 
   const menuItems = [
     { id: 'dashboard', label: 'Panel', icon: LayoutDashboard },
