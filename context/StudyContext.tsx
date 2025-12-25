@@ -243,13 +243,21 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateSettings = (newSettings: Partial<AppSettings>) => setSettings(prev => ({ ...prev, ...newSettings }));
 
   const logManualSession = (subjectId: string, topic: string, durationMinutes: number, stats: QuestionStats, date?: Date) => {
-      const totalQuestions = stats.correct + stats.incorrect + stats.empty;
-      const efficiency = totalQuestions > 0 ? Math.round((stats.correct / totalQuestions) * 100) : -1;
+      // Ensure stats are safe numbers
+      const safeStats = {
+          correct: Math.max(0, stats.correct || 0),
+          incorrect: Math.max(0, stats.incorrect || 0),
+          empty: Math.max(0, stats.empty || 0)
+      };
+      
+      const totalQuestions = safeStats.correct + safeStats.incorrect + safeStats.empty;
+      const efficiency = totalQuestions > 0 ? Math.round((safeStats.correct / totalQuestions) * 100) : -1;
+      
       const newHistoryItem: StudySession = {
           id: Date.now().toString(),
           subject: subjectId, topic: topic, tags: ['#manuel-kayıt'], sessionNote: 'Hızlı test girişi ile eklendi.',
           date: getFormattedDate(date || new Date()), timestamp: date ? date.getTime() : Date.now(),
-          durationMinutes: durationMinutes, questionStats: stats, totalQuestions: totalQuestions, logs: [], efficiency: efficiency, status: 'completed',
+          durationMinutes: Math.max(0, durationMinutes), questionStats: safeStats, totalQuestions: totalQuestions, logs: [], efficiency: efficiency, status: 'completed',
       };
       setHistory(prev => [newHistoryItem, ...prev]);
   };
@@ -288,7 +296,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       downloadCSV([headers.join(','), ...rows].join('\n'), `studyflow_gorevler_${getFormattedDate()}.csv`);
   };
   const exportData = () => {
-      const data = { settings, history, subjects, tasks, version: '1.5' }; 
+      const data = { settings, history, subjects, tasks, version: '1.6' }; 
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `studyflow_backup_${getFormattedDate()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -297,14 +305,19 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
           const data = JSON.parse(jsonStr);
           if (!data || typeof data !== 'object') return { success: false, message: 'Geçersiz dosya formatı.' };
-          if (!Array.isArray(data.history) && !Array.isArray(data.tasks) && !Array.isArray(data.subjects) && !data.settings) return { success: false, message: 'Tanınmayan yedek dosyası.' };
+          
+          // STRICT VALIDATION
+          // Check for essential keys to ensure it's a StudyFlow backup
+          if (!Array.isArray(data.history) && !Array.isArray(data.tasks) && !Array.isArray(data.subjects) && !data.settings) {
+              return { success: false, message: 'Tanınmayan yedek dosyası. (Geçersiz Yapı)' };
+          }
           
           if(Array.isArray(data.history)) setHistory(data.history.map((h: any) => ({ ...h, tags: Array.isArray(h.tags) ? h.tags : [], logs: Array.isArray(h.logs) ? h.logs : [], questionStats: h.questionStats || {correct:0,incorrect:0,empty:0} })));
           if(Array.isArray(data.tasks)) setTasks(data.tasks);
           if(Array.isArray(data.subjects)) setSubjects(data.subjects);
           if(data.settings) setSettings({...settings, ...data.settings});
           return { success: true, message: 'Veriler başarıyla yüklendi.' };
-      } catch (e) { return { success: false, message: 'Dosya okunamadı.' }; }
+      } catch (e) { return { success: false, message: 'Dosya okunamadı. JSON hatası.' }; }
   };
   const resetApp = () => { localStorage.clear(); window.location.reload(); };
 
@@ -440,25 +453,29 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const finishSession = (finalStats?: QuestionStats) => {
-        if (finalStats && activeSession) {
-             const sessionDurationMinutes = activeSession.mode === 'stopwatch' 
-              ? Math.floor(activeSession.timeLeft / 60)
-              : Math.floor((activeSession.totalDuration - activeSession.timeLeft) / 60);
-             
-              const totalQuestions = finalStats.correct + finalStats.incorrect + finalStats.empty;
-              const efficiency = totalQuestions > 0 ? Math.round((finalStats.correct / totalQuestions) * 100) : -1;
-              
-              addHistoryItem({
-                  id: Date.now().toString(),
-                  subject: activeSession.subjectId, topic: activeSession.topic, tags: activeSession.tags || [],
-                  sessionNote: activeSession.sessionNote, date: getFormattedDate(), timestamp: Date.now(),
-                  durationMinutes: Math.max(1, sessionDurationMinutes), questionStats: finalStats,
-                  totalQuestions: totalQuestions, logs: activeSession.logs, efficiency: efficiency, status: 'completed',
-              });
-              setActiveSession(null);
-        } else {
-            stopSession('completed');
-        }
+        // Race condition guard: Ensure we have an active session before trying to finish it
+        setActiveSession(current => {
+            if (!current) return null; // Already finished or null
+
+            const sessionDurationMinutes = current.mode === 'stopwatch' 
+              ? Math.floor(current.timeLeft / 60)
+              : Math.floor((current.totalDuration - current.timeLeft) / 60);
+            
+            // If finalStats provided (from Summary screen), use them. Otherwise use current stats.
+            const statsToUse = finalStats || current.stats;
+            const totalQuestions = statsToUse.correct + statsToUse.incorrect + statsToUse.empty;
+            const efficiency = totalQuestions > 0 ? Math.round((statsToUse.correct / totalQuestions) * 100) : -1;
+            
+            addHistoryItem({
+                id: Date.now().toString(),
+                subject: current.subjectId, topic: current.topic, tags: current.tags || [],
+                sessionNote: current.sessionNote, date: getFormattedDate(), timestamp: Date.now(),
+                durationMinutes: Math.max(1, sessionDurationMinutes), questionStats: statsToUse,
+                totalQuestions: totalQuestions, logs: current.logs, efficiency: efficiency, status: 'completed',
+            });
+            
+            return null; // Clear session
+        });
     };
 
     const restartSession = () => {

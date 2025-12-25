@@ -3,7 +3,8 @@ import React, { useState } from 'react';
 import { 
   Calculator, Atom, FlaskConical, Dna, BookOpen, Landmark, Plus,
   CloudRain, Trees, Clock, Target, Play, CheckCircle2,
-  Timer, Watch, Zap, X, ListTodo, FolderOpen, MousePointer2, Tag, Hourglass, Layers, Infinity
+  Timer, Zap, X, ListTodo, FolderOpen, MousePointer2, Tag, Hourglass, Layers, Infinity,
+  Brain, Coffee, Flame, Battery
 } from 'lucide-react';
 import { ViewState, TimerMode } from '../types';
 import { useStudy, useTimer } from '../context/StudyContext';
@@ -94,9 +95,15 @@ const NewSession: React.FC<NewSessionProps> = ({ onChangeView }) => {
           return;
       }
       const finalGoal = questionGoal === '' ? 0 : questionGoal;
-      const finalTags = overrideTags || tags;
+      // Merge existing tags with override tags if any, avoiding duplicates
+      const currentTags = [...tags];
+      if (overrideTags) {
+          overrideTags.forEach(t => {
+              if (!currentTags.includes(t)) currentTags.push(t);
+          });
+      }
       
-      startSession(mode, selectedSubject, finalTopic, finalTags, duration, finalGoal, selectedAmbient, selectedTaskId);
+      startSession(mode, currentSubject.id, finalTopic, currentTags, duration, finalGoal, selectedAmbient, selectedTaskId);
       onChangeView('dashboard');
   };
 
@@ -113,6 +120,7 @@ const NewSession: React.FC<NewSessionProps> = ({ onChangeView }) => {
       if (val === '') {
           setQuestionGoal('');
       } else {
+          // Prevent negative values
           setQuestionGoal(Math.max(0, parseInt(val)));
       }
   };
@@ -151,8 +159,16 @@ const NewSession: React.FC<NewSessionProps> = ({ onChangeView }) => {
   // Safe duration handler
   const handleDurationChange = (val: string) => {
       if(val === '') setCustomDuration('');
-      else setCustomDuration(Math.max(1, parseInt(val)));
+      else setCustomDuration(Math.max(1, parseInt(val))); // Ensure minimum 1 minute
   };
+
+  // --- Clock Modes Data ---
+  const PRESET_MODES = [
+      { id: 'pomodoro', name: 'Pomodoro', duration: 25, icon: Timer, color: 'text-red-500', bg: 'bg-red-500', border: 'border-red-200 dark:border-red-900', desc: '25dk Çalış • 5dk Mola', tags: ['#pomodoro'] },
+      { id: 'long', name: 'Uzun Odak', duration: 50, icon: Brain, color: 'text-blue-500', bg: 'bg-blue-500', border: 'border-blue-200 dark:border-blue-900', desc: '50dk Derinleşme', tags: ['#derin-odak'] },
+      { id: 'short', name: 'Hızlı Seri', duration: 15, icon: Zap, color: 'text-orange-500', bg: 'bg-orange-500', border: 'border-orange-200 dark:border-orange-900', desc: '15dk Pratik', tags: ['#hızlı'] },
+      { id: 'block', name: 'Blok Ders', duration: 90, icon: Layers, color: 'text-purple-500', bg: 'bg-purple-500', border: 'border-purple-200 dark:border-purple-900', desc: '90dk Blok', tags: ['#blok'] },
+  ];
 
   return (
     <div className="animate-fade-in max-w-6xl mx-auto relative pb-24">
@@ -356,35 +372,51 @@ const NewSession: React.FC<NewSessionProps> = ({ onChangeView }) => {
                  </div>
             </div>
 
-            {/* 2. Quick Start Modes Grid */}
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4">Hızlı Başlat</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Mode A: Stopwatch (Free) */}
-                <button 
-                    onClick={() => handleStart('stopwatch', 0)}
-                    className="group relative overflow-hidden bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900 dark:to-slate-900 border border-indigo-200 dark:border-indigo-500/30 hover:border-indigo-400 rounded-2xl p-6 text-left transition-all hover:shadow-lg hover:shadow-indigo-500/10 active:scale-98"
-                >
-                    <div className="flex items-center space-x-3 mb-2">
-                        <div className="p-2 bg-indigo-500 rounded-lg text-white"><Play size={20} fill="currentColor" /></div>
-                        <span className="font-bold text-indigo-700 dark:text-indigo-200">Serbest Kronometre</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">Süre sınırı ve hedefi olmadan çalış.</p>
-                </button>
-
-                {/* Mode B: Pomodoro */}
-                <button 
-                    onClick={() => handleStart('timer', 25)}
-                    className="group relative overflow-hidden bg-gradient-to-br from-red-50 to-white dark:from-red-900/50 dark:to-slate-900 border border-red-200 dark:border-red-500/30 hover:border-red-400 rounded-2xl p-6 text-left transition-all hover:shadow-lg hover:shadow-red-500/10 active:scale-98"
-                >
-                    <div className="flex items-center space-x-3 mb-2">
-                        <div className="p-2 bg-red-500 rounded-lg text-white"><Zap size={20} fill="currentColor" /></div>
-                        <span className="font-bold text-red-700 dark:text-red-200">Pomodoro (25dk)</span>
-                    </div>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">Klasik 25dk odaklanma.</p>
-                </button>
+            {/* 2. Clock Modes & Presets */}
+            <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4 flex items-center gap-2">
+                <Clock size={20} className="text-primary"/> Çalışma Modu Seç
+            </h3>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {PRESET_MODES.map(mode => (
+                    <button 
+                        key={mode.id}
+                        onClick={() => handleStart('timer', mode.duration, undefined, mode.tags)}
+                        className={`group relative overflow-hidden bg-white dark:bg-slate-800 border ${mode.border} rounded-xl p-4 text-left transition-all hover:shadow-lg hover:scale-[1.02] active:scale-95`}
+                    >
+                        <div className="flex items-center justify-between mb-2">
+                             <div className={`p-2 rounded-lg ${mode.bg} bg-opacity-10 text-opacity-100 ${mode.color}`}>
+                                 <mode.icon size={20} />
+                             </div>
+                             <span className={`text-xl font-bold ${mode.color}`}>{mode.duration}</span>
+                        </div>
+                        <h4 className="font-bold text-slate-800 dark:text-white text-sm">{mode.name}</h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">{mode.desc}</p>
+                    </button>
+                ))}
             </div>
 
-            {/* 3. Exam Simulation Section (UPDATED: Generic Terms) */}
+            {/* 3. Stopwatch Mode (Full Width) */}
+            <button 
+                onClick={() => handleStart('stopwatch', 0)}
+                className="w-full group relative overflow-hidden bg-gradient-to-r from-slate-100 to-white dark:from-slate-800 dark:to-slate-900 border border-slate-200 dark:border-slate-700 hover:border-slate-400 rounded-xl p-4 flex items-center justify-between transition-all hover:shadow-md active:scale-[0.99]"
+            >
+                <div className="flex items-center gap-4">
+                    <div className="p-3 bg-slate-200 dark:bg-slate-700 rounded-full text-slate-600 dark:text-slate-300 group-hover:bg-slate-300 dark:group-hover:bg-slate-600 transition-colors">
+                        <Play size={24} fill="currentColor" />
+                    </div>
+                    <div className="text-left">
+                        <h4 className="font-bold text-slate-900 dark:text-white">Serbest Kronometre</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Süre sınırı olmadan çalış. Süre yukarı doğru sayar.</p>
+                    </div>
+                </div>
+                <div className="text-slate-300 dark:text-slate-600 group-hover:text-primary transition-colors">
+                    <Infinity size={32} />
+                </div>
+            </button>
+
+
+            {/* 4. Exam Simulation Section */}
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-4 flex items-center gap-2">
                 <Hourglass size={20} className="text-amber-500"/> Deneme Simülasyonu
             </h3>
@@ -412,66 +444,40 @@ const NewSession: React.FC<NewSessionProps> = ({ onChangeView }) => {
                 </button>
             </div>
 
-            {/* Mode C: Custom Duration (UPDATED DESIGN: Card Block) */}
+            {/* 5. Custom Duration */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm mt-4 relative overflow-hidden group">
-                {/* Decorative Background Blob */}
                 <div className="absolute -right-6 -top-6 w-32 h-32 bg-primary/5 rounded-full blur-3xl pointer-events-none group-hover:bg-primary/10 transition-colors duration-500"></div>
 
                 <div className="relative z-10">
                     <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
                         <div className="flex items-center space-x-2">
-                            <Clock size={20} className="text-primary" />
-                            <span className="font-bold text-slate-900 dark:text-white">Özel Süre Ayarla</span>
-                        </div>
-                        <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
-                            <button 
-                                onClick={() => setCustomMode('timer')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${customMode === 'timer' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                            >
-                                Geri Sayım
-                            </button>
-                            <button 
-                                onClick={() => setCustomMode('stopwatch')}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${customMode === 'stopwatch' ? 'bg-white dark:bg-slate-700 text-indigo-500 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-                            >
-                                Kronometre
-                            </button>
+                            <Clock size={20} className="text-slate-400" />
+                            <span className="font-bold text-slate-900 dark:text-white">Manuel Süre</span>
                         </div>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
-                        {/* Left: Input Area */}
                         <div className="flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-900 rounded-2xl border-2 border-transparent focus-within:border-primary/50 transition-all relative">
-                            {customMode === 'timer' ? (
-                                <>
-                                    <input 
-                                        type="number" 
-                                        min="1" max="180" 
-                                        value={customDuration} 
-                                        onChange={(e) => handleDurationChange(e.target.value)}
-                                        className="text-6xl font-bold bg-transparent text-center w-full focus:outline-none text-slate-800 dark:text-white font-mono tracking-tight"
-                                        placeholder="00"
-                                    />
-                                    <span className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-2">Dakika</span>
-                                </>
-                            ) : (
-                                <div className="text-center py-2">
-                                    <div className="text-6xl text-slate-300 dark:text-slate-700 mb-2 flex justify-center"><Infinity size={64}/></div>
-                                    <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">Süre Sınırı Yok</span>
-                                </div>
-                            )}
+                            <input 
+                                type="number" 
+                                min="1" max="300" 
+                                value={customDuration} 
+                                onChange={(e) => handleDurationChange(e.target.value)}
+                                className="text-6xl font-bold bg-transparent text-center w-full focus:outline-none text-slate-800 dark:text-white font-mono tracking-tight"
+                                placeholder="00"
+                            />
+                            <span className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-2">Dakika</span>
                         </div>
 
-                        {/* Right: Presets & Action */}
                         <div className="flex flex-col justify-between gap-4">
                             <div>
                                 <p className="text-xs font-bold text-slate-400 uppercase mb-2">Hızlı Seçim</p>
                                 <div className="grid grid-cols-4 gap-2">
-                                    {[15, 30, 45, 60].map(min => (
+                                    {[20, 40, 60, 80].map(min => (
                                         <button 
                                             key={min} 
                                             onClick={() => { setCustomMode('timer'); setCustomDuration(min); }} 
-                                            className={`py-2 rounded-lg text-xs font-bold border transition-all active:scale-95 ${customDuration === min && customMode === 'timer' ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-primary/50'}`}
+                                            className={`py-2 rounded-lg text-xs font-bold border transition-all active:scale-95 ${customDuration === min ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400'}`}
                                         >
                                             {min}
                                         </button>
@@ -480,22 +486,15 @@ const NewSession: React.FC<NewSessionProps> = ({ onChangeView }) => {
                             </div>
                             
                             <button 
-                                onClick={() => handleStart(customMode, (customMode === 'timer' ? (typeof customDuration === 'number' ? customDuration : 0) : 0))} 
-                                disabled={customMode === 'timer' && !customDuration}
-                                className="w-full bg-primary hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-xl text-lg font-bold transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 active:scale-98"
+                                onClick={() => handleStart('timer', (typeof customDuration === 'number' ? customDuration : 0))} 
+                                disabled={!customDuration}
+                                className="w-full bg-slate-800 dark:bg-white hover:bg-slate-700 dark:hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-white dark:text-slate-900 py-4 rounded-xl text-lg font-bold transition-all shadow-lg flex items-center justify-center gap-2 active:scale-98"
                             >
-                                {customMode === 'timer' ? <Zap size={20} fill="currentColor"/> : <Play size={20} fill="currentColor"/>}
-                                Başlat
+                                <Play size={20} fill="currentColor"/>
+                                Özel Süre ile Başla
                             </button>
                         </div>
                     </div>
-                    
-                    {customMode === 'stopwatch' && (
-                        <p className="text-xs text-slate-400 mt-4 flex items-center gap-1 justify-center opacity-70">
-                            <MousePointer2 size={12} />
-                            Kronometre modunda süre ileri doğru akar.
-                        </p>
-                    )}
                 </div>
             </div>
 
