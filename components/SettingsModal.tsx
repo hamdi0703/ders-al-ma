@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { 
     X, Moon, Sun, Volume2, Palette, Download, Upload, Trash2, 
     Bell, Languages, Monitor, HardDrive, RotateCcw, Check, AlertTriangle, User,
-    Target, FileSpreadsheet, FileText, CheckCircle2, AlertCircle
+    Target, FileSpreadsheet, FileText, CheckCircle2, AlertCircle, Laptop
 } from 'lucide-react';
 import { useStudy } from '../context/StudyContext';
 import { ThemeColor } from '../types';
@@ -13,13 +13,17 @@ type SettingsTab = 'general' | 'appearance' | 'data';
 export const SettingsModal: React.FC = () => {
     const { 
         isSettingsOpen, toggleSettings, settings, updateSettings, 
-        exportData, importData, resetApp, exportHistoryToCSV, exportTasksToCSV
+        exportData, importData, resetApp, exportHistoryToCSV, exportTasksToCSV,
+        installPrompt, setInstallPrompt
     } = useStudy();
     
     const [activeTab, setActiveTab] = useState<SettingsTab>('general');
     const [confirmReset, setConfirmReset] = useState(false);
     const [importStatus, setImportStatus] = useState<{type: 'success'|'error', msg: string} | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Check if running in standalone mode (already installed)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
     if (!isSettingsOpen) return null;
 
@@ -30,6 +34,16 @@ export const SettingsModal: React.FC = () => {
         {id: 'green', bg: 'bg-green-500'},
         {id: 'rose', bg: 'bg-rose-500'},
     ];
+
+    const handleInstallClick = () => {
+        if (!installPrompt) return;
+        installPrompt.prompt();
+        installPrompt.userChoice.then((choiceResult: any) => {
+            if (choiceResult.outcome === 'accepted') {
+                setInstallPrompt(null);
+            }
+        });
+    };
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -71,6 +85,36 @@ export const SettingsModal: React.FC = () => {
             case 'general':
                 return (
                     <div className="space-y-6 animate-fade-in">
+                        
+                        {/* Install App Section (Only if not installed) */}
+                        {!isStandalone && (
+                            <div className="p-5 bg-gradient-to-br from-indigo-600 to-blue-600 rounded-2xl text-white shadow-lg transform transition-all hover:scale-[1.02]">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <h3 className="font-bold text-lg flex items-center gap-2">
+                                            <Laptop size={22} className="text-blue-200" /> 
+                                            Uygulamayı Yükle
+                                        </h3>
+                                        <p className="text-xs text-blue-100 mt-2 leading-relaxed opacity-90">
+                                            StudyFlow'u bilgisayarına veya telefonuna indirerek internetsiz kullanabilirsin.
+                                        </p>
+                                    </div>
+                                    {installPrompt ? (
+                                        <button 
+                                            onClick={handleInstallClick}
+                                            className="px-5 py-2.5 bg-white text-blue-600 rounded-xl font-bold text-sm hover:bg-blue-50 transition-colors shadow-xl shrink-0 flex items-center gap-2"
+                                        >
+                                            <Download size={16} /> Yükle
+                                        </button>
+                                    ) : (
+                                        <div className="bg-white/10 p-2 rounded-lg border border-white/20 text-[10px] text-center max-w-[120px] shrink-0 font-medium">
+                                            Tarayıcı menüsünden <strong>"Uygulamayı Yükle"</strong> veya <strong>"Ana Ekrana Ekle"</strong> seçin.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Profile Settings */}
                         <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-600">
                              <div className="flex items-center gap-2 mb-3">

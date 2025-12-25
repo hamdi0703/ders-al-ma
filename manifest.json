@@ -1,8 +1,9 @@
+
 {
   "name": "StudyFlow Pro",
   "short_name": "StudyFlow",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#0B1120",
   "theme_color": "#3b82f6",
@@ -10,13 +11,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/3209/3209265.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/3209/3209265.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

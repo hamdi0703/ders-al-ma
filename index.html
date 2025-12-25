@@ -1,10 +1,11 @@
+
 <!DOCTYPE html>
 <html lang="tr" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>StudyFlow Pro</title>
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#3b82f6">
     
     <!-- PWA & Mobile Capable Meta Tags -->
@@ -169,7 +170,7 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
+      navigator.serviceWorker.register('./sw.js')
         .then(registration => console.log('SW registered'))
         .catch(err => console.log('SW failed', err));
     });
