@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>StudyFlow Pro</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#3b82f6">
+    
+    <!-- PWA & Mobile Capable Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StudyFlow">
+    <!-- iOS Icon Support -->
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3209/3209265.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              background: '#0B1120', // Keep for dark mode specific
+              surface: '#1e293b',
+              // Using CSS variables for dynamic theming with RGB opacity support
+              primary: 'rgb(var(--color-primary-rgb) / <alpha-value>)', 
+              secondary: '#6366f1',
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.5s ease-out',
+              'slide-up': 'slideUp 0.5s ease-out',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+              'blob': 'blob 7s infinite',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(20px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              },
+              shake: {
+                '10%, 90%': { transform: 'translate3d(-1px, 0, 0)' },
+                '20%, 80%': { transform: 'translate3d(2px, 0, 0)' },
+                '30%, 50%, 70%': { transform: 'translate3d(-4px, 0, 0)' },
+                '40%, 60%': { transform: 'translate3d(4px, 0, 0)' }
+              },
+              blob: {
+                '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                '100%': { transform: 'translate(0px, 0px) scale(1)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Default Blue Theme */
+        --color-primary: #3b82f6;
+        --color-primary-rgb: 59 130 246; /* RGB components for opacity support */
+      }
+      
+      body { 
+        font-family: 'Inter', sans-serif; 
+        background-color: #f0f4f8; 
+        color: #0f172a;
+        transition: background-color 0.3s ease, color 0.3s ease;
+        overflow-x: hidden;
+        /* Prevent pull-to-refresh on mobile for app feel */
+        overscroll-behavior-y: none;
+      }
+
+      /* Background Mesh Gradient for Light Mode */
+      body::before {
+        content: '';
+        position: fixed;
+        top: 0; left: 0; width: 100vw; height: 100vh;
+        background: 
+          radial-gradient(circle at 15% 50%, rgba(var(--color-primary-rgb), 0.08), transparent 25%), 
+          radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.08), transparent 25%);
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      .dark body {
+        background-color: #0B1120;
+        color: #e2e8f0;
+      }
+
+      /* Background Mesh Gradient for Dark Mode */
+      .dark body::before {
+        background: 
+          radial-gradient(circle at 15% 50%, rgba(var(--color-primary-rgb), 0.15), transparent 25%), 
+          radial-gradient(circle at 85% 30%, rgba(99, 102, 241, 0.1), transparent 25%);
+      }
+      
+      /* Glassmorphism Utilities */
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      
+      .dark .glass {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      /* Neon Glow for Charts/Timers */
+      .neon-stroke {
+        filter: drop-shadow(0 0 4px var(--color-primary));
+      }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .dark ::-webkit-scrollbar-track { background: #0f172a; }
+      .dark ::-webkit-scrollbar-thumb { background: #334155; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      .dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+      
+      /* Range Slider */
+      input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        height: 20px;
+        width: 20px;
+        border-radius: 50%;
+        background: var(--color-primary);
+        cursor: pointer;
+        margin-top: -8px;
+        box-shadow: 0 0 10px rgba(var(--color-primary-rgb), 0.5);
+      }
+      input[type=range]::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 4px;
+        cursor: pointer;
+        background: #cbd5e1; /* Light mode track */
+        border-radius: 2px;
+      }
+      .dark input[type=range]::-webkit-slider-runnable-track {
+        background: #334155; /* Dark mode track */
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0"
+  }
+}
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => console.log('SW registered'))
+        .catch(err => console.log('SW failed', err));
+    });
+  }
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
