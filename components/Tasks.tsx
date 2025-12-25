@@ -21,16 +21,9 @@ const getPriorityColor = (p: TaskPriority) => {
 };
 
 const getRelativeTime = (timestamp: number) => {
-    const now = new Date();
     const date = new Date(timestamp);
-    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diffInSeconds < 60) return 'Az önce';
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} dk önce`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} sa önce`;
-    if (diffInSeconds < 172800) return 'Dün';
-    
-    return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
+    // User requested full date instead of "Just now" style relative time
+    return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
 };
 
 const getDeadlineBadge = (timestamp?: number) => {
@@ -107,7 +100,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isCompact = false, onEdit }) 
                         {/* Created At Info */}
                         <div className="flex items-center gap-1 mt-0.5">
                             <Clock size={10} className="text-slate-300" />
-                            <span className="text-[10px] text-slate-400">Eklendi: {getRelativeTime(task.createdAt)}</span>
+                            <span className="text-[10px] text-slate-400">{getRelativeTime(task.createdAt)}</span>
                         </div>
                     </div>
                 </div>

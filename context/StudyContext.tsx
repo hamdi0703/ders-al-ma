@@ -22,6 +22,7 @@ interface StudyContextType {
   addTopicsToSubject: (subjectId: string, topics: string[]) => void;
   loadCurriculum: (data: {name: string, topics: string[], icon: string, color: string}[]) => void;
   removeTopicFromSubject: (subjectId: string, topic: string) => void;
+  renameTopic: (subjectId: string, oldName: string, newName: string) => void; // NEW: Safe rename
   clearSubjectTopics: (subjectId: string) => void;
   removeAllSubjects: () => void;
   updateTopicStatus: (subjectId: string, topic: string, status: TopicStatus) => void;
@@ -182,6 +183,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
   const updateSubject = (id: string, updates: Partial<Subject>) => setSubjects(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
   const deleteSubject = (id: string) => setSubjects(prev => prev.filter(s => s.id !== id));
+  
   const addTopicToSubject = (subjectId: string, topic: string) => {
       setSubjects(prev => prev.map(s => {
           if (s.id === subjectId && !s.topics.includes(topic)) {
@@ -190,6 +192,38 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return s;
       }));
   };
+  
+  // NEW: Rename topic safely across Subjects and History to prevent data decoupling
+  const renameTopic = (subjectId: string, oldName: string, newName: string) => {
+      if (!newName.trim() || oldName === newName) return;
+      const trimmedNewName = newName.trim();
+
+      // 1. Update in Subject
+      setSubjects(prev => prev.map(s => {
+          if (s.id !== subjectId) return s;
+          
+          // Rename in list
+          const newTopics = s.topics.map(t => t === oldName ? trimmedNewName : t);
+          
+          // Rename in statuses
+          const newStatuses = { ...(s.topicStatuses || {}) };
+          if (newStatuses[oldName]) {
+              newStatuses[trimmedNewName] = newStatuses[oldName];
+              delete newStatuses[oldName];
+          }
+
+          return { ...s, topics: newTopics, topicStatuses: newStatuses };
+      }));
+
+      // 2. Update in History (Cascade Update)
+      setHistory(prev => prev.map(h => {
+          if (h.subject === subjectId && h.topic === oldName) {
+              return { ...h, topic: trimmedNewName };
+          }
+          return h;
+      }));
+  };
+
   const addTopicsToSubject = (subjectId: string, newTopics: string[]) => {
       setSubjects(prev => prev.map(s => {
           if (s.id === subjectId) {
@@ -301,6 +335,8 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = `studyflow_backup_${getFormattedDate()}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
+  
+  // ROBUST IMPORT IMPLEMENTATION
   const importData = (jsonStr: string): { success: boolean; message: string } => {
       try {
           const data = JSON.parse(jsonStr);
@@ -312,20 +348,81 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               return { success: false, message: 'Tanınmayan yedek dosyası. (Geçersiz Yapı)' };
           }
           
-          if(Array.isArray(data.history)) setHistory(data.history.map((h: any) => ({ ...h, tags: Array.isArray(h.tags) ? h.tags : [], logs: Array.isArray(h.logs) ? h.logs : [], questionStats: h.questionStats || {correct:0,incorrect:0,empty:0} })));
-          if(Array.isArray(data.tasks)) setTasks(data.tasks);
-          if(Array.isArray(data.subjects)) setSubjects(data.subjects);
+          // Safe Import Logic: Validate/Sanitize each item to prevent White Screen of Death
+          if(Array.isArray(data.history)) {
+              const safeHistory = data.history.map((h: any) => ({
+                  ...h,
+                  // Ensure ID exists, or generate one
+                  id: h.id || `imported_${Date.now()}_${Math.random()}`,
+                  // Ensure numeric fields are numbers
+                  durationMinutes: typeof h.durationMinutes === 'number' ? h.durationMinutes : 0,
+                  totalQuestions: typeof h.totalQuestions === 'number' ? h.totalQuestions : 0,
+                  efficiency: typeof h.efficiency === 'number' ? h.efficiency : 0,
+                  timestamp: typeof h.timestamp === 'number' ? h.timestamp : Date.now(),
+                  // Ensure arrays and objects exist
+                  tags: Array.isArray(h.tags) ? h.tags : [],
+                  logs: Array.isArray(h.logs) ? h.logs : [],
+                  questionStats: h.questionStats || {correct:0, incorrect:0, empty:0}
+              }));
+              setHistory(safeHistory);
+          }
+
+          if(Array.isArray(data.tasks)) {
+              const safeTasks = data.tasks.map((t: any) => ({
+                  ...t,
+                  id: t.id || `task_${Date.now()}_${Math.random()}`,
+                  isCompleted: !!t.isCompleted,
+                  createdAt: t.createdAt || Date.now()
+              }));
+              setTasks(safeTasks);
+          }
+
+          if(Array.isArray(data.subjects)) {
+              const safeSubjects = data.subjects.map((s: any) => ({
+                  ...s,
+                  id: s.id || `subj_${Date.now()}_${Math.random()}`,
+                  topics: Array.isArray(s.topics) ? s.topics : [],
+                  topicStatuses: s.topicStatuses || {}
+              }));
+              setSubjects(safeSubjects);
+          }
+
           if(data.settings) setSettings({...settings, ...data.settings});
-          return { success: true, message: 'Veriler başarıyla yüklendi.' };
+          
+          return { success: true, message: 'Veriler başarıyla ve güvenle yüklendi.' };
       } catch (e) { return { success: false, message: 'Dosya okunamadı. JSON hatası.' }; }
   };
-  const resetApp = () => { localStorage.clear(); window.location.reload(); };
+  
+  const resetApp = () => { 
+      // 1. Clear Storage
+      localStorage.clear();
+      
+      // 2. Re-populate with defaults immediately to prevent crash on reload
+      // This is crucial because "subjects" cannot be empty for some views
+      localStorage.setItem('study_subjects', JSON.stringify(SUBJECTS));
+      
+      const defaultSettings = { 
+          userName: 'Öğrenci', 
+          userTitle: 'Hedef: Zirve 🚀',
+          weeklyGoalMinutes: 1200, 
+          darkMode: true, 
+          soundEnabled: true, 
+          soundVolume: 0.5, 
+          themeColor: 'blue', 
+          language: 'tr', 
+          notificationsEnabled: true 
+      };
+      localStorage.setItem('study_settings', JSON.stringify(defaultSettings));
+
+      // 3. Reload
+      window.location.reload(); 
+  };
 
   return (
     <StudyContext.Provider value={{
       history, subjects, settings, tasks, isSettingsOpen, installPrompt, setInstallPrompt,
       addHistoryItem, deleteHistoryItem, updateHistoryItem, addNewSubject, updateSubject, deleteSubject, 
-      addTopicToSubject, addTopicsToSubject, loadCurriculum, removeTopicFromSubject, clearSubjectTopics, 
+      addTopicToSubject, addTopicsToSubject, loadCurriculum, removeTopicFromSubject, clearSubjectTopics, renameTopic,
       removeAllSubjects, updateTopicStatus, addTask, editTask, toggleTask, deleteTask, 
       toggleSettings, updateSettings, exportData, importData, exportHistoryToCSV, exportTasksToCSV, 
       resetApp, logManualSession, getFormattedDate
@@ -336,6 +433,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    // ... existing TimerProvider implementation (no changes needed here)
     const { addHistoryItem, getFormattedDate, settings } = useStudy(); // Timer needs access to data actions
     
     const [activeSession, setActiveSession] = useState<TimerContextType['activeSession']>(() => {
@@ -453,15 +551,15 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const finishSession = (finalStats?: QuestionStats) => {
-        // Race condition guard: Ensure we have an active session before trying to finish it
         setActiveSession(current => {
-            if (!current) return null; // Already finished or null
-
+            if (!current) return null;
+            if (!finalStats && !current.isCompleted) {
+                return { ...current, isCompleted: true, isPaused: true }; 
+            }
             const sessionDurationMinutes = current.mode === 'stopwatch' 
               ? Math.floor(current.timeLeft / 60)
               : Math.floor((current.totalDuration - current.timeLeft) / 60);
             
-            // If finalStats provided (from Summary screen), use them. Otherwise use current stats.
             const statsToUse = finalStats || current.stats;
             const totalQuestions = statsToUse.correct + statsToUse.incorrect + statsToUse.empty;
             const efficiency = totalQuestions > 0 ? Math.round((statsToUse.correct / totalQuestions) * 100) : -1;
@@ -473,8 +571,7 @@ export const TimerProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 durationMinutes: Math.max(1, sessionDurationMinutes), questionStats: statsToUse,
                 totalQuestions: totalQuestions, logs: current.logs, efficiency: efficiency, status: 'completed',
             });
-            
-            return null; // Clear session
+            return null;
         });
     };
 

@@ -19,8 +19,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
     Calculator, Atom, FlaskConical, Dna, BookOpen, Landmark, BrainCircuit, Globe, Scale
 };
 
-// --- DATA: CURRICULUM BUNDLES (Refined for Separation) ---
-
+// ... (CURRICULUM DATA CONSTANTS TYT_DATA, AYT_DATA etc. remain same, skipping for brevity but assume they are here) ...
 const TYT_DATA = [
     {
         name: 'TYT Türkçe',
@@ -360,7 +359,11 @@ interface AugmentedTestLog extends TestLog {
 }
 
 const Subjects: React.FC = () => {
-  const { subjects, history, addTopicToSubject, addTopicsToSubject, loadCurriculum, removeTopicFromSubject, deleteSubject, addNewSubject, updateSubject, updateTopicStatus, clearSubjectTopics, removeAllSubjects } = useStudy();
+  const { 
+      subjects, history, addTopicToSubject, addTopicsToSubject, loadCurriculum, 
+      removeTopicFromSubject, deleteSubject, addNewSubject, updateSubject, 
+      updateTopicStatus, clearSubjectTopics, removeAllSubjects, renameTopic 
+  } = useStudy();
   
   // Navigation State
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
@@ -385,6 +388,10 @@ const Subjects: React.FC = () => {
   const [editColor, setEditColor] = useState('');
   const [editIcon, setEditIcon] = useState('');
 
+  // Edit Topic State (New for Safe Rename)
+  const [editingTopic, setEditingTopic] = useState<{name: string, isEditing: boolean}>({ name: '', isEditing: false });
+  const [tempTopicName, setTempTopicName] = useState('');
+
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -400,19 +407,26 @@ const Subjects: React.FC = () => {
 
   const currentSubject = useMemo(() => subjects.find(s => s.id === selectedSubjectId), [subjects, selectedSubjectId]);
 
+  // --- Calculate Total Topic Counts for Sidebar (Includes History) ---
+  const topicCounts = useMemo(() => {
+      const counts: Record<string, number> = {};
+      subjects.forEach(s => {
+          const uniqueTopics = new Set(s.topics);
+          history.filter(h => h.subject === s.id).forEach(h => {
+              if(h.topic) uniqueTopics.add(h.topic);
+          });
+          counts[s.id] = uniqueTopics.size;
+      });
+      return counts;
+  }, [subjects, history]);
+
   // --- DATA PROCESSING ENGINE ---
-  
-  // 1. Get all logs and sessions for the selected Subject
   const subjectData = useMemo(() => {
       if (!selectedSubjectId) return null;
 
-      // Filter history for this subject
       const relevantHistory = history.filter(h => h.subject === selectedSubjectId);
-      
-      // Initialize topic map
       const topicMap: Record<string, TopicAggregatedData> = {};
 
-      // Ensure all registered topics exist in the map even if no data
       currentSubject?.topics.forEach(t => {
           const currentStatus = currentSubject.topicStatuses?.[t] || 'not-started';
           topicMap[t] = {
@@ -422,11 +436,8 @@ const Subjects: React.FC = () => {
           };
       });
 
-      // Process History
       relevantHistory.forEach(session => {
           const tName = session.topic;
-          
-          // If topic not in map (maybe deleted from subject list but exists in history), add it
           if (!topicMap[tName]) {
               topicMap[tName] = {
                   name: tName, duration: 0, totalQuestions: 0, totalCorrect: 0, 
@@ -435,10 +446,8 @@ const Subjects: React.FC = () => {
               };
           }
 
-          // Aggregate Duration (Session based)
           topicMap[tName].duration += session.durationMinutes;
 
-          // Process Embedded Test Logs
           if (session.logs && session.logs.length > 0) {
               session.logs.forEach(log => {
                   const logNet = log.correct - (log.incorrect * 0.25);
@@ -457,7 +466,6 @@ const Subjects: React.FC = () => {
                   });
               });
           } else if (session.totalQuestions > 0) {
-              // If no specific logs but session has stats (Quick Session)
               topicMap[tName].totalQuestions += session.totalQuestions;
               topicMap[tName].totalCorrect += session.questionStats.correct;
               topicMap[tName].totalIncorrect += session.questionStats.incorrect;
@@ -465,17 +473,14 @@ const Subjects: React.FC = () => {
           }
       });
 
-      // Calculate Derived Stats (Accuracy, Net) for each Topic
       Object.values(topicMap).forEach(t => {
           if (t.totalQuestions > 0) {
               t.accuracy = Math.round((t.totalCorrect / t.totalQuestions) * 100);
               t.net = t.totalCorrect - (t.totalIncorrect * 0.25);
           }
-          // Sort logs by timestamp desc
           t.testLogs.sort((a, b) => b.timestamp - a.timestamp);
       });
 
-      // Calculate Overall Subject Stats
       const overall = Object.values(topicMap).reduce((acc, curr) => ({
           duration: acc.duration + curr.duration,
           questions: acc.questions + curr.totalQuestions,
@@ -486,11 +491,9 @@ const Subjects: React.FC = () => {
 
       const overallAccuracy = overall.questions > 0 ? Math.round((overall.correct / overall.questions) * 100) : 0;
 
-      // Calculate Completion Percentage based on Status (Weighted: Complete=1, Working=0.5)
       const totalTopics = Object.keys(topicMap).length;
       const completedCount = Object.values(topicMap).filter(t => t.status === 'completed').length;
       const workingCount = Object.values(topicMap).filter(t => t.status === 'working').length;
-      // Formula: Completed = 1, Working = 0.5
       const completionPercentage = totalTopics > 0 
         ? Math.round(((completedCount + (workingCount * 0.5)) / totalTopics) * 100) 
         : 0;
@@ -502,7 +505,6 @@ const Subjects: React.FC = () => {
       };
   }, [history, selectedSubjectId, currentSubject]);
 
-  // 2. Sorted Topics List
   const sortedTopics = useMemo(() => {
       if (!subjectData) return [];
       
@@ -528,17 +530,14 @@ const Subjects: React.FC = () => {
       });
   }, [subjectData, sortConfig]);
 
-  // 3. Chart Data for Selected Topic
   const topicChartData = useMemo(() => {
       if (!selectedTopic || !subjectData) return [];
       const logs = subjectData.topics[selectedTopic]?.testLogs || [];
-      
-      // Reverse to show oldest to newest
       return [...logs].reverse().map(log => ({
           name: log.name.length > 10 ? log.name.substring(0, 10) + '...' : log.name,
           net: log.net,
           accuracy: log.efficiency,
-          date: log.dateStr.substring(0, 5) // DD.MM
+          date: log.dateStr.substring(0, 5)
       }));
   }, [selectedTopic, subjectData]);
 
@@ -568,13 +567,26 @@ const Subjects: React.FC = () => {
       }
   };
 
+  const startEditingTopic = (e: React.MouseEvent, topicName: string) => {
+      e.stopPropagation();
+      setEditingTopic({ name: topicName, isEditing: true });
+      setTempTopicName(topicName);
+  };
+
+  const saveTopicRename = () => {
+      if (currentSubject && tempTopicName.trim() && tempTopicName.trim() !== editingTopic.name) {
+          renameTopic(currentSubject.id, editingTopic.name, tempTopicName.trim());
+      }
+      setEditingTopic({ name: '', isEditing: false });
+  };
+
+  const cancelTopicRename = () => {
+      setEditingTopic({ name: '', isEditing: false });
+  };
+
   const handleBulkAdd = () => {
       if (!currentSubject || !bulkText.trim()) return;
-      
-      const lines = bulkText.split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0);
-          
+      const lines = bulkText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
       if (lines.length > 0) {
           addTopicsToSubject(currentSubject.id, lines);
           setBulkText('');
@@ -663,7 +675,6 @@ const Subjects: React.FC = () => {
      return <Icon size={20} className="pointer-events-none" />;
   };
 
-  // Available colors for editing
   const subjectColors = [
       'bg-blue-600', 'bg-purple-600', 'bg-teal-600', 'bg-green-600', 
       'bg-yellow-600', 'bg-orange-600', 'bg-red-600', 'bg-pink-600', 
@@ -698,7 +709,6 @@ const Subjects: React.FC = () => {
                    <button onClick={() => setIsEditSubjectModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X size={20} /></button>
                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Dersi Düzenle</h3>
                    
-                   {/* Name */}
                    <div className="mb-4">
                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Ders Adı</label>
                        <input 
@@ -707,7 +717,6 @@ const Subjects: React.FC = () => {
                        />
                    </div>
 
-                   {/* Color Picker */}
                    <div className="mb-4">
                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Renk Seçimi</label>
                        <div className="flex flex-wrap gap-2">
@@ -721,7 +730,6 @@ const Subjects: React.FC = () => {
                        </div>
                    </div>
 
-                   {/* Icon Picker */}
                    <div className="mb-6">
                        <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">İkon Seçimi</label>
                        <div className="grid grid-cols-6 gap-2">
@@ -743,6 +751,27 @@ const Subjects: React.FC = () => {
                    <div className="flex justify-end gap-2">
                        <button onClick={() => setIsEditSubjectModalOpen(false)} className="px-4 py-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white">İptal</button>
                        <button onClick={saveEditedSubject} className="px-6 py-2 bg-primary text-white rounded-xl hover:brightness-110 font-bold">Kaydet</button>
+                   </div>
+               </div>
+           </div>
+       )}
+
+       {/* Modal: Rename Topic */}
+       {editingTopic.isEditing && (
+           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
+               <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700 animate-slide-up shadow-2xl">
+                   <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Konuyu Yeniden Adlandır</h3>
+                   <p className="text-xs text-slate-500 mb-4">Dikkat: Bu işlem geçmiş çalışma kayıtlarındaki konu adını da güncelleyecektir.</p>
+                   <input 
+                        type="text" 
+                        value={tempTopicName} 
+                        onChange={(e) => setTempTopicName(e.target.value)}
+                        className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white mb-4 focus:border-primary focus:outline-none"
+                        autoFocus
+                   />
+                   <div className="flex justify-end gap-2">
+                       <button onClick={cancelTopicRename} className="px-4 py-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white">İptal</button>
+                       <button onClick={saveTopicRename} className="px-6 py-2 bg-primary text-white rounded-xl hover:brightness-110 font-bold">Kaydet</button>
                    </div>
                </div>
            </div>
@@ -774,102 +803,30 @@ const Subjects: React.FC = () => {
            </div>
        )}
 
+       {/* ... (Other Modals: Curriculum, Delete Subject, Reset Confirm, Clear Topics - No logic change, skipping display for brevity but keeping implementation) ... */}
        {/* Modal: Curriculum Wizard */}
        {isCurriculumModalOpen && (
            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
                <div className="bg-white dark:bg-slate-800 p-8 rounded-3xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 animate-slide-up shadow-2xl relative max-h-[90vh] overflow-y-auto">
                    <button onClick={() => setIsCurriculumModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X size={20} /></button>
-                   
                    <div className="text-center mb-8">
                        <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/20">
                            <Wand2 size={32} className="text-white"/>
                        </div>
                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Müfredat Sihirbazı</h3>
-                       <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                           Alanını seç, derslerini ve konularını tek tıkla yükleyelim.
-                       </p>
+                       <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">Alanını seç, derslerini ve konularını tek tıkla yükleyelim.</p>
                    </div>
-                   
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       {/* TYT Card */}
-                       <button 
-                            onClick={() => handleLoadCurriculum(TYT_DATA)}
-                            className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"
-                       >
-                           <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                               <BookOpen size={24} />
-                           </div>
-                           <div>
-                               <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">TYT Konuları</h4>
-                               <p className="text-xs text-slate-500">Tüm dersler (120 Soru)</p>
-                           </div>
-                       </button>
-
-                       {/* AYT Sayısal Card */}
-                       <button 
-                            onClick={() => handleLoadCurriculum(AYT_SAYISAL_DATA)}
-                            className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"
-                       >
-                           <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg group-hover:bg-green-500 group-hover:text-white transition-colors">
-                               <Calculator size={24} />
-                           </div>
-                           <div>
-                               <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400">AYT Sayısal</h4>
-                               <p className="text-xs text-slate-500">Mat, Fizik, Kimya, Biyo</p>
-                           </div>
-                       </button>
-
-                       {/* AYT Sözel Card */}
-                       <button 
-                            onClick={() => handleLoadCurriculum(AYT_SOZEL_DATA)}
-                            className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"
-                       >
-                           <div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg group-hover:bg-orange-500 group-hover:text-white transition-colors">
-                               <Landmark size={24} />
-                           </div>
-                           <div>
-                               <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400">AYT Sözel</h4>
-                               <p className="text-xs text-slate-500">Edb, Tarih, Coğ, Felsefe...</p>
-                           </div>
-                       </button>
-
-                       {/* AYT Eşit Ağırlık Card */}
-                       <button 
-                            onClick={() => handleLoadCurriculum(AYT_EA_DATA)}
-                            className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-pink-500 dark:hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"
-                       >
-                           <div className="p-3 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-lg group-hover:bg-pink-500 group-hover:text-white transition-colors">
-                               <Scale size={24} />
-                           </div>
-                           <div>
-                               <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-pink-600 dark:group-hover:text-pink-400">AYT Eşit Ağırlık</h4>
-                               <p className="text-xs text-slate-500">Edb, Mat, Tarih, Coğ</p>
-                           </div>
-                       </button>
-
-                       {/* KPSS Card */}
-                       <button 
-                            onClick={() => handleLoadCurriculum(KPSS_DATA)}
-                            className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-rose-500 dark:hover:border-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"
-                       >
-                           <div className="p-3 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg group-hover:bg-rose-500 group-hover:text-white transition-colors">
-                               <CheckCircle2 size={24} />
-                           </div>
-                           <div>
-                               <h4 className="font-bold text-slate-800 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400">KPSS (Lisans)</h4>
-                               <p className="text-xs text-slate-500">GY - GK Konuları</p>
-                           </div>
-                       </button>
+                       <button onClick={() => handleLoadCurriculum(TYT_DATA)} className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"><div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg group-hover:bg-blue-500 group-hover:text-white transition-colors"><BookOpen size={24} /></div><div><h4 className="font-bold text-slate-800 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">TYT Konuları</h4><p className="text-xs text-slate-500">Tüm dersler (120 Soru)</p></div></button>
+                       <button onClick={() => handleLoadCurriculum(AYT_SAYISAL_DATA)} className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-green-500 dark:hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"><div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-lg group-hover:bg-green-500 group-hover:text-white transition-colors"><Calculator size={24} /></div><div><h4 className="font-bold text-slate-800 dark:text-white group-hover:text-green-600 dark:group-hover:text-green-400">AYT Sayısal</h4><p className="text-xs text-slate-500">Mat, Fizik, Kimya, Biyo</p></div></button>
+                       <button onClick={() => handleLoadCurriculum(AYT_SOZEL_DATA)} className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-orange-500 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"><div className="p-3 bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 rounded-lg group-hover:bg-orange-500 group-hover:text-white transition-colors"><Landmark size={24} /></div><div><h4 className="font-bold text-slate-800 dark:text-white group-hover:text-orange-600 dark:group-hover:text-orange-400">AYT Sözel</h4><p className="text-xs text-slate-500">Edb, Tarih, Coğ, Felsefe...</p></div></button>
+                       <button onClick={() => handleLoadCurriculum(AYT_EA_DATA)} className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-pink-500 dark:hover:border-pink-500 hover:bg-pink-50 dark:hover:bg-pink-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"><div className="p-3 bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 rounded-lg group-hover:bg-pink-500 group-hover:text-white transition-colors"><Scale size={24} /></div><div><h4 className="font-bold text-slate-800 dark:text-white group-hover:text-pink-600 dark:group-hover:text-pink-400">AYT Eşit Ağırlık</h4><p className="text-xs text-slate-500">Edb, Mat, Tarih, Coğ</p></div></button>
+                       <button onClick={() => handleLoadCurriculum(KPSS_DATA)} className="group p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-rose-500 dark:hover:border-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-all text-left flex items-center gap-4 relative overflow-hidden"><div className="p-3 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-lg group-hover:bg-rose-500 group-hover:text-white transition-colors"><CheckCircle2 size={24} /></div><div><h4 className="font-bold text-slate-800 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400">KPSS (Lisans)</h4><p className="text-xs text-slate-500">GY - GK Konuları</p></div></button>
                    </div>
-                   
-                   <p className="text-xs text-slate-400 mt-6 text-center">
-                       Not: Mevcut dersleriniz silinmez, yeni konular listenize eklenir. <br/> "TYT" ve "AYT" dersleri ayrı başlıklar altında açılır.
-                   </p>
+                   <p className="text-xs text-slate-400 mt-6 text-center">Not: Mevcut dersleriniz silinmez, yeni konular listenize eklenir. "TYT" ve "AYT" dersleri ayrı başlıklar altında açılır.</p>
                </div>
            </div>
        )}
-
-       {/* Modal: Delete Subject Confirm */}
        {deleteConfirmationId && (
            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-slide-up">
@@ -883,16 +840,12 @@ const Subjects: React.FC = () => {
                </div>
            </div>
        )}
-
-       {/* Modal: Reset ALL Subjects Confirm */}
        {isResetConfirmOpen && (
            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-slide-up">
                     <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 rounded-full flex items-center justify-center mb-4 mx-auto text-red-500 animate-pulse"><RotateCcw size={32} /></div>
                     <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Ders Listesini Sıfırla?</h3>
-                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
-                        Mevcut <strong>tüm dersler ve konular</strong> listenizden silinecek. Çalışma geçmişiniz (analizler) korunur.
-                    </p>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Mevcut <strong>tüm dersler ve konular</strong> listenizden silinecek. Çalışma geçmişiniz (analizler) korunur.</p>
                     <div className="grid grid-cols-2 gap-3">
                         <button onClick={() => setIsResetConfirmOpen(false)} className="py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">Vazgeç</button>
                         <button onClick={handleResetSubjects} className="py-3 rounded-xl bg-red-500 text-white font-bold">Sıfırla</button>
@@ -900,16 +853,12 @@ const Subjects: React.FC = () => {
                </div>
            </div>
        )}
-
-        {/* Modal: Clear Topics Confirm */}
        {isClearTopicsConfirmOpen && (
            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4">
                <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800 text-center animate-slide-up">
                     <div className="w-16 h-16 bg-orange-100 dark:bg-orange-500/20 rounded-full flex items-center justify-center mb-4 mx-auto text-orange-500"><Eraser size={32} /></div>
                     <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Konuları Temizle?</h3>
-                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">
-                        <strong>{currentSubject?.name}</strong> dersine ait tüm konular listeden silinecek. İstatistikler korunur.
-                    </p>
+                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm"><strong>{currentSubject?.name}</strong> dersine ait tüm konular listeden silinecek. İstatistikler korunur.</p>
                     <div className="grid grid-cols-2 gap-3">
                         <button onClick={() => setIsClearTopicsConfirmOpen(false)} className="py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold">Vazgeç</button>
                         <button onClick={handleClearTopics} className="py-3 rounded-xl bg-orange-500 text-white font-bold">Temizle</button>
@@ -936,12 +885,8 @@ const Subjects: React.FC = () => {
                     <div className="overflow-y-auto custom-scrollbar flex-1">
                         {subjects.map(subject => {
                             const isSelected = selectedSubjectId === subject.id;
-                            // Safe Color Handling: Default to blue if missing or invalid format
                             const safeColor = subject.color || 'bg-blue-500';
-                            
-                            // Safe class replacement
                             const textClass = safeColor.replace('bg-', 'text-').replace('600', '500').replace('800', '600');
-                            // Dynamic Border logic: Use inline style for safety
                             const borderColor = isSelected ? 'var(--color-primary)' : 'transparent';
 
                             return (
@@ -964,7 +909,7 @@ const Subjects: React.FC = () => {
                                         </span>
                                     </div>
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto mr-2 transition-colors ${isSelected ? 'bg-white/20 text-slate-900 dark:text-white' : 'bg-slate-100 dark:bg-slate-700/50 text-slate-500'}`}>
-                                        {subject.topics.length}
+                                        {topicCounts[subject.id] || 0}
                                     </span>
                                     <div className="flex items-center gap-1">
                                         <button 
@@ -1008,6 +953,7 @@ const Subjects: React.FC = () => {
                    {/* CASE 1: TOPIC DETAIL VIEW (Drill Down) */}
                    {selectedTopic ? (
                        <div className="animate-fade-in space-y-6">
+                           {/* ... (Existing Topic Detail View content remains same) ... */}
                            {/* Navigation Header */}
                            <div className="flex items-center gap-4">
                                <button 
@@ -1153,10 +1099,8 @@ const Subjects: React.FC = () => {
                                 className="p-6 rounded-2xl text-white shadow-lg relative overflow-hidden"
                                 style={{
                                     background: `linear-gradient(to right, ${currentSubject.color?.replace('bg-', '') === 'blue-500' ? '#3b82f6' : 'var(--color-primary)'}, #1e293b)`
-                                    // Fallback gradient if color parsing fails
                                 }}
                            >
-                               {/* Dynamic Background Overlay based on Tailwind class if possible, else generic */}
                                <div className={`absolute inset-0 opacity-80 bg-gradient-to-r ${currentSubject.color?.replace('bg-', 'from-') || 'from-blue-500'} to-slate-900`}></div>
                                
                                <div className="relative z-10">
@@ -1175,7 +1119,7 @@ const Subjects: React.FC = () => {
                                        </div>
                                        <div>
                                             <p className="text-white/60 text-xs font-bold uppercase">Konu Sayısı</p>
-                                            <p className="text-xl font-bold">{currentSubject.topics.length}</p>
+                                            <p className="text-xl font-bold">{subjectData ? Object.keys(subjectData.topics).length : 0}</p>
                                        </div>
                                        <div className="flex-1">
                                             <div className="flex justify-between items-center mb-1">
@@ -1197,7 +1141,7 @@ const Subjects: React.FC = () => {
                            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm overflow-hidden">
                                 <div className="flex justify-between items-center mb-6">
                                     <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                        <FolderOpen size={20} className="text-primary"/> Konu Performansı <span className="text-slate-400 text-sm font-normal">({currentSubject.topics.length})</span>
+                                        <FolderOpen size={20} className="text-primary"/> Konu Performansı <span className="text-slate-400 text-sm font-normal">({subjectData ? Object.keys(subjectData.topics).length : 0})</span>
                                     </h3>
                                     
                                     {/* Quick Actions */}
@@ -1240,7 +1184,7 @@ const Subjects: React.FC = () => {
                                                 <th className="py-3 px-2 text-right cursor-pointer hover:text-primary group" onClick={() => handleSort('questions')}>Soru <ArrowUpDown size={10} className="inline opacity-0 group-hover:opacity-100"/></th>
                                                 <th className="py-3 px-2 text-right cursor-pointer hover:text-primary group" onClick={() => handleSort('net')}>Net <ArrowUpDown size={10} className="inline opacity-0 group-hover:opacity-100"/></th>
                                                 <th className="py-3 px-2 text-right cursor-pointer hover:text-primary group" onClick={() => handleSort('accuracy')}>Başarı <ArrowUpDown size={10} className="inline opacity-0 group-hover:opacity-100"/></th>
-                                                <th className="py-3 px-2 w-10"></th>
+                                                <th className="py-3 px-2 w-16"></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1288,12 +1232,23 @@ const Subjects: React.FC = () => {
                                                         ) : <span className="text-slate-300">-</span>}
                                                     </td>
                                                     <td className="py-3 px-2 text-center">
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); removeTopicFromSubject(currentSubject.id, topic.name); }}
-                                                            className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
+                                                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            {/* New: Edit Topic Button */}
+                                                            <button 
+                                                                onClick={(e) => startEditingTopic(e, topic.name)}
+                                                                className="text-slate-300 hover:text-blue-500 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                                                title="Konuyu Düzenle"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={(e) => { e.stopPropagation(); removeTopicFromSubject(currentSubject.id, topic.name); }}
+                                                                className="text-slate-300 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                                title="Konuyu Sil"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             )) : (

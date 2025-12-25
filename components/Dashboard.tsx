@@ -1,11 +1,12 @@
 
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Play, Pause, RotateCcw, Zap, Plus, Minus, FilePlus2, 
   Trophy, StickyNote, BarChart3, AlertTriangle, 
   Maximize2, Minimize2, Trash2, PenLine, CheckSquare, 
   ListTodo, ClipboardEdit, Flame, Clock, Calendar, ArrowRight, History, XCircle,
-  MoreHorizontal
+  MoreHorizontal, Flag, Check, X, Percent, Calculator, Medal, Star, Sparkles, CheckCircle2
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, CartesianGrid, XAxis } from 'recharts';
 import { useStudy, useTimer } from '../context/StudyContext';
@@ -49,7 +50,69 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-// --- Extracted Summary View ---
+// --- Modern Live Stat Control ---
+const LiveStatRow = ({ label, value, type, onUpdate }: { label: string, value: number, type: 'correct' | 'incorrect' | 'empty', onUpdate: (n: number) => void }) => {
+    const config = {
+        correct: { color: 'green', icon: Check, bg: 'bg-green-500', text: 'text-green-600', border: 'border-green-200' },
+        incorrect: { color: 'red', icon: X, bg: 'bg-red-500', text: 'text-red-600', border: 'border-red-200' },
+        empty: { color: 'slate', icon: Minus, bg: 'bg-slate-400', text: 'text-slate-500', border: 'border-slate-200' }
+    }[type];
+
+    return (
+        <div className="group relative flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 transition-all">
+            <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${config.bg} bg-opacity-10 dark:bg-opacity-20`}>
+                    <config.icon size={20} className={`${config.text} dark:text-${config.color}-400`} strokeWidth={3} />
+                </div>
+                <div>
+                    <p className={`text-xs font-bold uppercase ${config.text} dark:text-${config.color}-400 opacity-80`}>{label}</p>
+                    <p className="text-xl font-bold text-slate-900 dark:text-white leading-none">{value}</p>
+                </div>
+            </div>
+            
+            <div className="flex items-center gap-1">
+                <button 
+                    onClick={() => onUpdate(-1)} 
+                    disabled={value <= 0}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+                >
+                    <Minus size={16} strokeWidth={3}/>
+                </button>
+                <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                <button 
+                    onClick={() => onUpdate(1)} 
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md hover:scale-105 active:scale-95 transition-all ${config.bg}`}
+                >
+                    <Plus size={16} strokeWidth={3}/>
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// --- CSS Confetti Component ---
+const ConfettiParticles = () => {
+    return (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            {Array.from({ length: 30 }).map((_, i) => (
+                <div 
+                    key={i}
+                    className="absolute w-2 h-2 rounded-full animate-blob opacity-60"
+                    style={{
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        backgroundColor: ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#a855f7'][Math.floor(Math.random() * 5)],
+                        animationDelay: `${Math.random() * 5}s`,
+                        animationDuration: `${5 + Math.random() * 5}s`,
+                        transform: `scale(${Math.random()})`
+                    }}
+                />
+            ))}
+        </div>
+    );
+};
+
+// --- REDESIGNED SUMMARY VIEW ---
 const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSession: any, finishSession: any, toggleTask: any }) => {
     const [summaryStats, setSummaryStats] = useState({ 
         correct: activeSession.stats.correct.toString(), 
@@ -71,70 +134,145 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
         });
     };
     
-    // Prevent negative inputs
-    const handleStatChange = (field: string, value: string) => {
-        const val = parseInt(value);
-        if (value === '' || (!isNaN(val) && val >= 0)) {
-            setSummaryStats(prev => ({ ...prev, [field]: value }));
-        }
-    };
+    // Derived Real-time stats
+    const correctVal = parseInt(summaryStats.correct) || 0;
+    const incorrectVal = parseInt(summaryStats.incorrect) || 0;
+    const emptyVal = parseInt(summaryStats.empty) || 0;
+    const totalQs = correctVal + incorrectVal + emptyVal;
+    const net = correctVal - (incorrectVal * 0.25);
+    const accuracy = totalQs > 0 ? Math.round((correctVal / totalQs) * 100) : 0;
 
     return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh] animate-slide-up text-center max-w-lg mx-auto px-4">
-            <div className="w-24 h-24 bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-500/20 animate-blob">
-                <Trophy size={48} />
-            </div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">Oturum Tamamlandı!</h1>
-            <p className="text-slate-500 dark:text-slate-400 mb-8">
-                <span className="font-bold text-slate-800 dark:text-slate-200">{activeSession.topic}</span> çalışman sona erdi.
-            </p>
-
-            {activeSession.linkedTaskId && (
-                <div 
-                    onClick={() => setMarkTaskCompleted(!markTaskCompleted)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all mb-6 text-left ${markTaskCompleted ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
-                >
-                    <div className={`text-${markTaskCompleted ? 'green-500' : 'slate-300'}`}>
-                        {markTaskCompleted ? <CheckSquare size={20} /> : <CheckSquare size={20} />}
-                    </div>
-                    <div>
-                        <p className={`text-sm font-bold ${markTaskCompleted ? 'text-green-700 dark:text-green-300' : 'text-slate-600 dark:text-slate-400'}`}>Bağlı Görevi Tamamla</p>
-                    </div>
-                </div>
-            )}
-
-            <div className="w-full bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm mb-6">
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                     <div className="text-center p-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
-                        <p className="text-xs text-slate-400 uppercase font-bold">Süre</p>
-                        <p className="text-xl font-bold text-slate-900 dark:text-white">{elapsedMinutes} dk</p>
-                     </div>
-                     <div className="text-center p-3 bg-slate-50 dark:bg-slate-900 rounded-xl">
-                        <p className="text-xs text-slate-400 uppercase font-bold">Toplam Soru</p>
-                        <p className="text-xl font-bold text-slate-900 dark:text-white">{(parseInt(summaryStats.correct)||0) + (parseInt(summaryStats.incorrect)||0) + (parseInt(summaryStats.empty)||0)}</p>
-                     </div>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto">
+            {/* Background Confetti */}
+            <ConfettiParticles />
+            
+            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 animate-slide-up z-10 overflow-hidden">
                 
-                <p className="text-xs font-bold text-slate-400 uppercase mb-3 text-left">Sonuçları Gir</p>
-                <div className="grid grid-cols-3 gap-3">
-                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-green-600 uppercase block text-center">Doğru</label>
-                        <input type="number" className="w-full bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/50 rounded-lg py-2 text-center font-bold text-green-700 dark:text-green-400 focus:outline-none focus:ring-2 focus:ring-green-500/50" value={summaryStats.correct} onChange={(e) => handleStatChange('correct', e.target.value)} />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-red-600 uppercase block text-center">Yanlış</label>
-                        <input type="number" className="w-full bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-lg py-2 text-center font-bold text-red-700 dark:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500/50" value={summaryStats.incorrect} onChange={(e) => handleStatChange('incorrect', e.target.value)} />
-                     </div>
-                     <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase block text-center">Boş</label>
-                        <input type="number" className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg py-2 text-center font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400/50" value={summaryStats.empty} onChange={(e) => handleStatChange('empty', e.target.value)} />
-                     </div>
-                </div>
-            </div>
+                {/* Decorative Top Gradient */}
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
 
-            <button onClick={handleFinish} className="w-full py-3.5 bg-primary hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all active:scale-95">
-                Kaydet ve Bitir
-            </button>
+                {/* Header */}
+                <div className="text-center mb-8">
+                    <div className="inline-block relative">
+                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-300 to-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30 mb-2 mx-auto animate-bounce">
+                            <Trophy size={40} className="text-white drop-shadow-md" />
+                        </div>
+                        <div className="absolute -top-1 -right-1">
+                            <Sparkles size={24} className="text-yellow-200 animate-pulse" />
+                        </div>
+                    </div>
+                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Harika İş Çıkardın!</h2>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
+                        <span className="text-slate-900 dark:text-white font-bold">{activeSession.topic}</span> oturumu tamamlandı.
+                    </p>
+                </div>
+
+                {/* Score Summary Banner */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center">
+                        <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
+                            <Clock size={12} /> Süre
+                        </div>
+                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
+                            {elapsedMinutes} <span className="text-sm font-medium text-slate-400">dk</span>
+                        </div>
+                    </div>
+                    <div className={`p-4 rounded-2xl border text-center transition-colors ${totalQs > 0 ? (accuracy >= 70 ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800') : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700'}`}>
+                        <div className={`flex items-center justify-center gap-2 text-xs font-bold uppercase mb-1 ${totalQs>0 ? (accuracy>=70?'text-green-600':'text-orange-600') : 'text-slate-400'}`}>
+                            {totalQs > 0 ? (accuracy>=70 ? <Medal size={12}/> : <Star size={12}/>) : <Calculator size={12}/>} Başarı
+                        </div>
+                        <div className={`text-2xl font-bold ${totalQs>0 ? (accuracy>=70?'text-green-600 dark:text-green-400':'text-orange-600 dark:text-orange-400') : 'text-slate-900 dark:text-white'}`}>
+                            {totalQs > 0 ? `%${accuracy}` : '-'}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Input Grid (Card Style) */}
+                <div className="space-y-4 mb-8">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Sonuçlarını Gir</p>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                        {/* Correct */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-green-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
+                            <div className="bg-white dark:bg-slate-800 border-2 border-green-100 dark:border-green-900/30 group-focus-within:border-green-500 rounded-2xl p-3 text-center transition-all">
+                                <label className="block text-green-600 dark:text-green-400 text-[10px] font-bold uppercase mb-1">Doğru</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    value={summaryStats.correct}
+                                    onChange={(e) => setSummaryStats(prev => ({...prev, correct: e.target.value}))}
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Incorrect */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-red-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
+                            <div className="bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900/30 group-focus-within:border-red-500 rounded-2xl p-3 text-center transition-all">
+                                <label className="block text-red-600 dark:text-red-400 text-[10px] font-bold uppercase mb-1">Yanlış</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    value={summaryStats.incorrect}
+                                    onChange={(e) => setSummaryStats(prev => ({...prev, incorrect: e.target.value}))}
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Empty */}
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-slate-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
+                            <div className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 group-focus-within:border-slate-400 rounded-2xl p-3 text-center transition-all">
+                                <label className="block text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase mb-1">Boş</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    value={summaryStats.empty}
+                                    onChange={(e) => setSummaryStats(prev => ({...prev, empty: e.target.value}))}
+                                    placeholder="0"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Net Result Bar */}
+                    {totalQs > 0 && (
+                        <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <span className="text-xs font-bold text-slate-500 uppercase">Toplam Net</span>
+                            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{net}</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Linked Task Toggle */}
+                {activeSession.linkedTaskId && (
+                    <div 
+                        onClick={() => setMarkTaskCompleted(!markTaskCompleted)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all mb-6 text-left ${markTaskCompleted ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                    >
+                        <div className={`p-1 rounded-full ${markTaskCompleted ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                            <Check size={14} strokeWidth={3} />
+                        </div>
+                        <div className="flex-1">
+                            <p className={`text-sm font-bold ${markTaskCompleted ? 'text-green-700 dark:text-green-300' : 'text-slate-600 dark:text-slate-400'}`}>Bağlı Görevi Tamamla</p>
+                            <p className="text-[10px] text-slate-400">Bu çalışma bir göreve bağlıydı.</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Action Buttons */}
+                <button 
+                    onClick={handleFinish} 
+                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-2xl font-bold shadow-xl shadow-slate-900/20 active:scale-98 transition-all flex items-center justify-center gap-2 text-lg"
+                >
+                    <CheckCircle2 size={20} /> Kaydet ve Çık
+                </button>
+
+            </div>
         </div>
     );
 };
@@ -148,8 +286,8 @@ const Modals = React.memo(({
     isManualLogOpen, setIsManualLogOpen,
     activeSession, subjects, confirmStopSession, updateTopic, addTestLog, addTask, logManualSession
 }: any) => {
-    // Reuse existing logic from previous implementation
-    const [testForm, setTestForm] = useState({ name: '', subjectId: '', topic: '', totalQuestions: '', correct: '', incorrect: '', empty: '', note: '' });
+    // UPDATED: Removed totalQuestions, logic now sums inputs
+    const [testForm, setTestForm] = useState({ name: '', subjectId: '', topic: '', correct: '', incorrect: '', empty: '', note: '' });
     const [tempTopic, setTempTopic] = useState('');
     const [quickTaskTitle, setQuickTaskTitle] = useState('');
     const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>('medium');
@@ -167,17 +305,6 @@ const Modals = React.memo(({
         }
     }, [isManualLogOpen, subjects]);
 
-    // Auto Calc Empty
-    useEffect(() => {
-        const t = parseInt(testForm.totalQuestions) || 0;
-        const c = parseInt(testForm.correct) || 0;
-        const i = parseInt(testForm.incorrect) || 0;
-        // Only auto-calc if total is entered and valid
-        if(t > 0 && c + i <= t) {
-             setTestForm(prev => ({ ...prev, empty: (t - (c + i)).toString() }));
-        }
-    }, [testForm.totalQuestions, testForm.correct, testForm.incorrect]);
-
     const handleAddTest = () => {
         addTestLog({
             name: testForm.name || `Test`,
@@ -188,7 +315,7 @@ const Modals = React.memo(({
             empty: parseInt(testForm.empty)||0,
             note: testForm.note
         });
-        setTestForm({ name: '', subjectId: '', topic: '', totalQuestions: '', correct: '', incorrect: '', empty: '', note: '' });
+        setTestForm({ name: '', subjectId: '', topic: '', correct: '', incorrect: '', empty: '', note: '' });
         setIsTestModalOpen(false);
     };
 
@@ -211,20 +338,59 @@ const Modals = React.memo(({
 
     return (
         <>
+            {/* UPDATED TEST MODAL: Modern & Simplified */}
             {isTestModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4 animate-fade-in">
-                    <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800 animate-slide-up space-y-4 relative">
+                    <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800 animate-slide-up space-y-5 relative">
                         <button onClick={()=>setIsTestModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><XCircle size={24}/></button>
-                        <h3 className="font-bold text-lg dark:text-white">Test Sonucu Ekle</h3>
-                        <input type="text" placeholder="Başlık (Opsiyonel)" className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white focus:border-primary focus:outline-none" value={testForm.name} onChange={e=>setTestForm({...testForm, name: e.target.value})} autoFocus/>
-                        <div className="grid grid-cols-4 gap-2">
-                             <input type="number" placeholder="Top." className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-center font-bold dark:text-white" value={testForm.totalQuestions} onChange={e=>setTestForm({...testForm, totalQuestions: e.target.value})}/>
-                             <input type="number" placeholder="D" className="p-3 rounded-xl bg-green-50 dark:bg-green-900/20 text-center font-bold text-green-600" value={testForm.correct} onChange={e=>setTestForm({...testForm, correct: e.target.value})}/>
-                             <input type="number" placeholder="Y" className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-center font-bold text-red-600" value={testForm.incorrect} onChange={e=>setTestForm({...testForm, incorrect: e.target.value})}/>
-                             <input type="number" placeholder="B" className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center font-bold text-slate-500" value={testForm.empty} onChange={e=>setTestForm({...testForm, empty: e.target.value})}/>
+                        
+                        <div className="flex items-center gap-3">
+                             <div className="p-2 bg-primary/10 rounded-lg text-primary"><FilePlus2 size={24}/></div>
+                             <h3 className="font-bold text-xl dark:text-white">Test Sonucu</h3>
                         </div>
-                        <input type="text" placeholder="Not ekle..." className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white text-sm focus:border-primary focus:outline-none" value={testForm.note} onChange={e=>setTestForm({...testForm, note: e.target.value})}/>
-                        <button onClick={handleAddTest} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20">Kaydet</button>
+
+                        <input 
+                            type="text" 
+                            placeholder="Test Adı / Kaynak (Örn: 3D Yayınları)" 
+                            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white focus:border-primary focus:outline-none font-medium" 
+                            value={testForm.name} 
+                            onChange={e=>setTestForm({...testForm, name: e.target.value})} 
+                            autoFocus
+                        />
+                        
+                        <div className="grid grid-cols-3 gap-3">
+                             <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-green-600 block text-center">Doğru</label>
+                                <input type="number" className="w-full p-3 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-900/30 text-center font-bold text-lg text-green-600 focus:outline-none focus:ring-2 focus:ring-green-500/50" value={testForm.correct} onChange={e=>setTestForm({...testForm, correct: e.target.value})}/>
+                             </div>
+                             <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-red-600 block text-center">Yanlış</label>
+                                <input type="number" className="w-full p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 text-center font-bold text-lg text-red-600 focus:outline-none focus:ring-2 focus:ring-red-500/50" value={testForm.incorrect} onChange={e=>setTestForm({...testForm, incorrect: e.target.value})}/>
+                             </div>
+                             <div className="space-y-1">
+                                <label className="text-[10px] uppercase font-bold text-slate-400 block text-center">Boş</label>
+                                <input type="number" className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center font-bold text-lg text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400/50" value={testForm.empty} onChange={e=>setTestForm({...testForm, empty: e.target.value})}/>
+                             </div>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 flex justify-between items-center border border-slate-100 dark:border-slate-700">
+                             <span className="text-xs font-bold text-slate-400 uppercase">Toplam Soru</span>
+                             <span className="text-lg font-bold text-slate-800 dark:text-white">
+                                 {(parseInt(testForm.correct)||0) + (parseInt(testForm.incorrect)||0) + (parseInt(testForm.empty)||0)}
+                             </span>
+                        </div>
+
+                        <input 
+                            type="text" 
+                            placeholder="Kısa bir not ekle..." 
+                            className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 dark:text-white text-sm focus:border-primary focus:outline-none" 
+                            value={testForm.note} 
+                            onChange={e=>setTestForm({...testForm, note: e.target.value})}
+                        />
+                        
+                        <button onClick={handleAddTest} className="w-full py-3.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/20 hover:brightness-110 active:scale-95 transition-all">
+                            Sonucu Kaydet
+                        </button>
                     </div>
                 </div>
             )}
@@ -438,6 +604,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
         ? "fixed inset-0 z-50 bg-slate-900 flex items-center justify-center p-4 animate-fade-in" 
         : "space-y-6 animate-slide-up relative";
 
+      // Calculate Net for Live View
+      const currentNet = activeSession.stats.correct - (activeSession.stats.incorrect * 0.25);
+      const totalQs = activeSession.stats.correct + activeSession.stats.incorrect + activeSession.stats.empty;
+      const currentAccuracy = totalQs > 0 ? Math.round((activeSession.stats.correct / totalQs) * 100) : 0;
+
       return (
         <div className={containerClasses}>
           <Modals 
@@ -486,13 +657,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                 <div className="relative flex-1 flex items-center justify-center w-full max-w-[400px] aspect-square my-4">
                     <svg className="w-full h-full" viewBox="0 0 400 400">
                         <defs>
-                            {/* Modern Gradient for Ticks - User Space to span the whole gauge */}
-                            <linearGradient id="gaugeGradient" x1="0%" y1="100%" x2="100%" y2="0%" gradientUnits="userSpaceOnUse">
-                                <stop offset="0%" stopColor="#06b6d4" />  {/* Cyan */}
-                                <stop offset="50%" stopColor="#8b5cf6" /> {/* Violet */}
-                                <stop offset="100%" stopColor="#ec4899" /> {/* Pink */}
-                            </linearGradient>
-                            
+                             {/* REMOVED: Rainbow Gradient. Using solid colors per user request */}
                             <filter id="needleGlow" x="-50%" y="-50%" width="200%" height="200%">
                                 <feGaussianBlur stdDeviation="2" result="coloredBlur" />
                                 <feMerge>
@@ -526,7 +691,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                             );
                         })}
 
-                        {/* 2. Active Ticks (Gradient) */}
+                        {/* 2. Active Ticks (Solid Blue) */}
                         {Array.from({ length: activeTicks }).map((_, i) => {
                             const angle = (i * 6) - 90;
                             const isMajor = i % 5 === 0;
@@ -542,14 +707,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                                 <line 
                                     key={`active-${i}`} 
                                     x1={x1} y1={y1} x2={x2} y2={y2} 
-                                    stroke="url(#gaugeGradient)" 
+                                    stroke="var(--color-primary)" 
                                     strokeWidth={isMajor ? 3 : 2}
                                     strokeLinecap="round"
                                 />
                             );
                         })}
 
-                        {/* 3. The Needle / Indicator (Current Position) */}
+                        {/* 3. The Needle / Indicator (Current Position) - Simple Blue */}
                         {(() => {
                             // Needle Position
                             const currentTickIndex = activeTicks > 0 ? activeTicks - 1 : 0;
@@ -566,7 +731,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                             return (
                                 <line 
                                     x1={nx1} y1={ny1} x2={nx2} y2={ny2}
-                                    stroke="#f43f5e" // Rose-500
+                                    stroke="var(--color-primary)"
                                     strokeWidth="4"
                                     strokeLinecap="round"
                                     filter="url(#needleGlow)"
@@ -598,48 +763,91 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                 </div>
 
                 {/* Controls */}
-                <div className="flex items-center gap-4 z-10 w-full justify-center max-w-md mt-4">
-                    <button onClick={() => setIsStopConfirmOpen(true)} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95" title="Bitir"><Trash2 size={24}/></button>
+                <div className="flex items-center gap-4 z-10 w-full justify-center max-w-lg mt-4">
+                    <button onClick={() => setIsStopConfirmOpen(true)} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95" title="İptal Et (Çöp)"><Trash2 size={24}/></button>
+                    
                     <button onClick={activeSession.isPaused ? resumeSession : pauseSession} className="flex-1 py-4 rounded-2xl bg-primary text-white font-bold text-xl flex items-center justify-center gap-3 shadow-xl shadow-primary/30 hover:brightness-110 active:scale-95 transition-all">
                         {activeSession.isPaused ? <Play size={24} fill="currentColor" /> : <Pause size={24} fill="currentColor" />}
                         <span>{activeSession.isPaused ? 'Devam Et' : 'Duraklat'}</span>
                     </button>
-                    <button onClick={restartSession} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-primary hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all active:scale-95" title="Yeniden Başlat"><RotateCcw size={24}/></button>
+                    
+                    {/* NEW: Finish Button */}
+                    <button onClick={() => finishSession()} className="p-4 rounded-2xl bg-green-500 text-white hover:bg-green-600 transition-all active:scale-95 shadow-lg shadow-green-500/20" title="Bitir ve Kaydet"><Check size={24} strokeWidth={3} /></button>
                 </div>
             </div>
 
-            {/* Right Stats Column */}
+            {/* Right Stats Column - Modernized */}
             {!isZenMode && (
-            <div className="space-y-6 flex flex-col">
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex-1">
-                    <SectionHeader title="Canlı İstatistik" icon={BarChart3} />
-                    <div className="space-y-3">
-                        <CounterRow label="Doğru" color="green" val={activeSession.stats.correct} onUpdate={(n) => updateQuestionStats('correct', n)} />
-                        <CounterRow label="Yanlış" color="red" val={activeSession.stats.incorrect} onUpdate={(n) => updateQuestionStats('incorrect', n)} />
-                        <CounterRow label="Boş" color="slate" val={activeSession.stats.empty} onUpdate={(n) => updateQuestionStats('empty', n)} />
+            <div className="flex flex-col gap-6 h-full">
+                
+                {/* 1. Live Stats Panel */}
+                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm flex-1 flex flex-col relative overflow-hidden">
+                    {/* Header with Live Indicator */}
+                    <div className="flex items-center justify-between mb-6">
+                        <SectionHeader title="Canlı İstatistik" icon={BarChart3} />
+                        <div className="flex items-center gap-2">
+                             <div className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded-lg flex items-center gap-1.5 border border-slate-200 dark:border-slate-600">
+                                <Calculator size={14} className="text-blue-500"/>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Net: {currentNet}</span>
+                             </div>
+                             <div className={`px-3 py-1 rounded-lg flex items-center gap-1.5 border ${currentAccuracy >= 50 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500'}`}>
+                                <Percent size={14} />
+                                <span className="text-xs font-bold">{currentAccuracy}%</span>
+                             </div>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-3 flex-1">
+                        <LiveStatRow label="Doğru" value={activeSession.stats.correct} type="correct" onUpdate={(n) => updateQuestionStats('correct', n)} />
+                        <LiveStatRow label="Yanlış" value={activeSession.stats.incorrect} type="incorrect" onUpdate={(n) => updateQuestionStats('incorrect', n)} />
+                        <LiveStatRow label="Boş" value={activeSession.stats.empty} type="empty" onUpdate={(n) => updateQuestionStats('empty', n)} />
                     </div>
                 </div>
                 
-                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
-                    <div className="relative mb-4">
-                        <StickyNote size={16} className="absolute left-3 top-3 text-slate-400" />
-                        <input type="text" placeholder="Not ekle..." className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:border-primary focus:outline-none dark:text-white" value={activeSession.sessionNote || ''} onChange={(e) => updateActiveSessionNote(e.target.value)} />
+                {/* 2. Tools Panel (Notes & Test Add) */}
+                <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 p-6 shadow-sm">
+                    <div className="relative mb-4 group">
+                        <div className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-primary transition-colors">
+                            <StickyNote size={18} />
+                        </div>
+                        <input 
+                            type="text" 
+                            placeholder="Bir not ekle..." 
+                            className="w-full pl-10 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none dark:text-white transition-all placeholder:text-slate-400" 
+                            value={activeSession.sessionNote || ''} 
+                            onChange={(e) => updateActiveSessionNote(e.target.value)} 
+                        />
                     </div>
-                    <button onClick={() => setIsTestModalOpen(true)} className="w-full py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
-                        <FilePlus2 size={18} /> <span>Test Sonucu Ekle</span>
+
+                    <button 
+                        onClick={() => setIsTestModalOpen(true)} 
+                        className="w-full py-4 bg-gradient-to-r from-slate-800 to-slate-900 dark:from-slate-700 dark:to-slate-800 hover:from-primary hover:to-blue-600 dark:hover:from-primary dark:hover:to-blue-600 text-white rounded-xl font-bold shadow-lg shadow-slate-900/10 hover:shadow-primary/25 transition-all flex items-center justify-center gap-3 group active:scale-[0.98]"
+                    >
+                        <FilePlus2 size={20} className="group-hover:scale-110 transition-transform" /> 
+                        <span>Test Sonucu Ekle</span>
                     </button>
                     
+                    {/* Mini Log List (Modernized) */}
                     {activeSession.logs.length > 0 && (
-                         <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                             <p className="text-xs font-bold text-slate-400 uppercase mb-2">Eklenenler</p>
-                             <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                         <div className="mt-5 pt-5 border-t border-slate-100 dark:border-slate-700/50">
+                             <div className="flex justify-between items-center mb-3">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Eklenen Testler</p>
+                                <span className="bg-slate-100 dark:bg-slate-700 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{activeSession.logs.length}</span>
+                             </div>
+                             <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-1">
                                 {activeSession.logs.map(log => (
-                                    <div key={log.id} className="flex justify-between items-center text-xs p-2 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-slate-700">
-                                        <span className="truncate w-24 font-medium dark:text-slate-300">{log.name}</span>
-                                        <div className="flex space-x-2 font-mono">
-                                            <span className="text-green-500">{log.correct}D</span>
-                                            <span className="text-red-500">{log.incorrect}Y</span>
-                                            <button onClick={() => removeTestLog(log.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={12}/></button>
+                                    <div key={log.id} className="group flex justify-between items-center text-xs p-3 bg-slate-50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/50 hover:border-slate-200 dark:hover:border-slate-600 transition-all shadow-sm">
+                                        <div className="flex flex-col truncate pr-2">
+                                            <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{log.name}</span>
+                                            {log.note && <span className="text-[10px] text-slate-400 truncate">{log.note}</span>}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex space-x-1 font-mono text-[10px] font-bold bg-white dark:bg-slate-900 px-2 py-1 rounded border border-slate-100 dark:border-slate-700">
+                                                <span className="text-green-600">{log.correct}D</span>
+                                                <span className="text-slate-300">|</span>
+                                                <span className="text-red-500">{log.incorrect}Y</span>
+                                            </div>
+                                            <button onClick={() => removeTestLog(log.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded transition-colors"><Trash2 size={14}/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -812,17 +1020,5 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
     </div>
   );
 };
-
-// Helper Components
-const CounterRow = ({label, color, val, onUpdate}: any) => (
-    <div className={`flex items-center justify-between p-2 rounded-lg bg-${color}-50 dark:bg-${color}-900/10 border border-${color}-100 dark:border-${color}-900/20`}>
-        <span className={`text-xs font-bold text-${color}-600 dark:text-${color}-400 uppercase w-12`}>{label}</span>
-        <div className="flex items-center space-x-3">
-            <button onClick={() => onUpdate(-1)} className={`w-7 h-7 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center transition`}><Minus size={14}/></button>
-            <span className="text-lg font-bold w-8 text-center text-slate-800 dark:text-white">{val}</span>
-            <button onClick={() => onUpdate(1)} className={`w-7 h-7 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center transition`}><Plus size={14}/></button>
-        </div>
-    </div>
-);
 
 export default Dashboard;
