@@ -5,7 +5,7 @@ import {
   TrendingUp, Microscope, AlertTriangle,
   Calendar, BrainCircuit,
   Activity, Tag, BarChart2, PieChart as PieIcon,
-  ArrowUpRight, ArrowDownRight, Layers
+  ArrowUpRight, ArrowDownRight, Layers, Minus, TrendingDown
 } from 'lucide-react';
 import { 
     LineChart, Line, XAxis, ResponsiveContainer, Tooltip,
@@ -57,6 +57,45 @@ const Analytics: React.FC = () => {
   const completedSessions = history.filter(h => h.status === 'completed').length;
   
   const dailyGoalHours = parseFloat((settings.weeklyGoalMinutes / 7 / 60).toFixed(1));
+
+  // --- Trend Calculation (Last 7 Days vs Previous 7 Days) ---
+  const trendStats = useMemo(() => {
+      const now = new Date();
+      // Reset to end of today to include all of today's sessions in the lookback
+      const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      
+      const currentPeriodStart = new Date(endOfToday);
+      currentPeriodStart.setDate(currentPeriodStart.getDate() - 7); // Last 7 days start point
+      
+      const prevPeriodStart = new Date(currentPeriodStart);
+      prevPeriodStart.setDate(prevPeriodStart.getDate() - 7); // Previous 7 days start point
+
+      let currentMinutes = 0;
+      let prevMinutes = 0;
+
+      history.forEach(h => {
+          if (h.timestamp > currentPeriodStart.getTime()) {
+              currentMinutes += h.durationMinutes;
+          } else if (h.timestamp > prevPeriodStart.getTime()) {
+              prevMinutes += h.durationMinutes;
+          }
+      });
+
+      let percentage = 0;
+      if (prevMinutes > 0) {
+          percentage = Math.round(((currentMinutes - prevMinutes) / prevMinutes) * 100);
+      } else if (currentMinutes > 0) {
+          percentage = 100; // From 0 to something is 100% growth
+      }
+
+      return { 
+          percentage, 
+          isUp: percentage > 0,
+          isDown: percentage < 0,
+          isNeutral: percentage === 0,
+          diffMinutes: currentMinutes - prevMinutes
+      };
+  }, [history]);
 
   // --- 1. OVERVIEW DATA ---
   
@@ -269,7 +308,34 @@ const Analytics: React.FC = () => {
                     <KPICard label="Toplam Süre" val={totalHoursStr} icon={Clock} color="blue" />
                     <KPICard label="Oturumlar" val={completedSessions} icon={CheckCircle2} color="purple" />
                     <KPICard label="Aktif Ders" val={subjectChartData.length} icon={Target} color="orange" />
-                    <KPICard label="Veri Puanı" val={history.length * 10} icon={TrendingUp} color="indigo" subtext="XP" />
+                    
+                    {/* NEW TREND CARD REPLACING DATA SCORE */}
+                    <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div className="flex justify-between items-start mb-2">
+                            <p className="text-slate-500 dark:text-slate-400 text-[10px] md:text-xs font-bold uppercase truncate">Haftalık Trend</p>
+                            <div className={`p-1.5 rounded-lg ${
+                                trendStats.isUp ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' :
+                                trendStats.isDown ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
+                                'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                            }`}>
+                                {trendStats.isUp ? <TrendingUp size={14} /> : trendStats.isDown ? <TrendingDown size={14} /> : <Minus size={14} />}
+                            </div>
+                        </div>
+                        <div>
+                            <div className="flex items-baseline gap-1">
+                                <p className={`text-xl md:text-2xl font-bold ${
+                                    trendStats.isUp ? 'text-green-600 dark:text-green-400' : 
+                                    trendStats.isDown ? 'text-red-500 dark:text-red-400' : 
+                                    'text-slate-900 dark:text-white'
+                                }`}>
+                                    {trendStats.isNeutral ? '-%' : `%${Math.abs(trendStats.percentage)}`}
+                                </p>
+                                {trendStats.isUp && <ArrowUpRight size={16} className="text-green-500" />}
+                                {trendStats.isDown && <ArrowDownRight size={16} className="text-red-500" />}
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-medium">Geçen haftaya göre</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

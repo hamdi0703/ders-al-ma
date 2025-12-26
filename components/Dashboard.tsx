@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Play, Pause, RotateCcw, Zap, Plus, Minus, FilePlus2, 
@@ -5,7 +6,7 @@ import {
   Maximize2, Minimize2, Trash2, PenLine, CheckSquare, 
   ListTodo, ClipboardEdit, Flame, Clock, Calendar, ArrowRight, History, XCircle,
   MoreHorizontal, Flag, Check, X, Percent, Calculator, Medal, Star, Sparkles, CheckCircle2,
-  Timer, Brain, Layers, Hourglass, ChevronDown, FolderOpen
+  Timer, Brain, Layers, Hourglass, ChevronDown, FolderOpen, Hash
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, CartesianGrid, XAxis } from 'recharts';
 import { useStudy, useTimer } from '../context/StudyContext';
@@ -73,6 +74,7 @@ const LiveStatRow = ({ label, value, type, onUpdate }: { label: string, value: n
                 <button 
                     onClick={() => onUpdate(-1)} 
                     disabled={value <= 0}
+                    aria-label={`${label} sayısını azalt`}
                     className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-transparent transition-all"
                 >
                     <Minus size={16} strokeWidth={3}/>
@@ -80,6 +82,7 @@ const LiveStatRow = ({ label, value, type, onUpdate }: { label: string, value: n
                 <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
                 <button 
                     onClick={() => onUpdate(1)} 
+                    aria-label={`${label} sayısını arttır`}
                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-md hover:scale-105 active:scale-95 transition-all ${config.bg}`}
                 >
                     <Plus size={16} strokeWidth={3}/>
@@ -89,30 +92,9 @@ const LiveStatRow = ({ label, value, type, onUpdate }: { label: string, value: n
     );
 };
 
-// --- CSS Confetti Component ---
-const ConfettiParticles = () => {
-    return (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-            {Array.from({ length: 30 }).map((_, i) => (
-                <div 
-                    key={i}
-                    className="absolute w-2 h-2 rounded-full animate-blob opacity-60"
-                    style={{
-                        left: `${Math.random() * 100}%`,
-                        top: `${Math.random() * 100}%`,
-                        backgroundColor: ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#a855f7'][Math.floor(Math.random() * 5)],
-                        animationDelay: `${Math.random() * 5}s`,
-                        animationDuration: `${5 + Math.random() * 5}s`,
-                        transform: `scale(${Math.random()})`
-                    }}
-                />
-            ))}
-        </div>
-    );
-};
-
-// --- REDESIGNED SUMMARY VIEW ---
+// --- REDESIGNED SUMMARY VIEW (MINIMALIST) ---
 const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSession: any, finishSession: any, toggleTask: any }) => {
+    const { subjects } = useStudy();
     const [summaryStats, setSummaryStats] = useState({ 
         correct: activeSession.stats.correct.toString(), 
         incorrect: activeSession.stats.incorrect.toString(), 
@@ -140,136 +122,134 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
     const totalQs = correctVal + incorrectVal + emptyVal;
     const net = correctVal - (incorrectVal * 0.25);
     const accuracy = totalQs > 0 ? Math.round((correctVal / totalQs) * 100) : 0;
+    
+    const subjectName = subjects.find((s: any) => s.id === activeSession.subjectId)?.name || 'Ders';
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4 animate-fade-in overflow-y-auto">
-            {/* Background Confetti */}
-            <ConfettiParticles />
-            
-            <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 md:p-8 animate-slide-up z-10 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-md p-4 animate-fade-in overflow-y-auto">
+            <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-0 animate-slide-up z-10 overflow-hidden flex flex-col">
                 
-                {/* Decorative Top Gradient */}
-                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
-
-                {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-block relative">
-                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-300 to-amber-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30 mb-2 mx-auto animate-bounce">
-                            <Trophy size={40} className="text-white drop-shadow-md" />
-                        </div>
-                        <div className="absolute -top-1 -right-1">
-                            <Sparkles size={24} className="text-yellow-200 animate-pulse" />
-                        </div>
+                {/* Header: Clean & Informative */}
+                <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <CheckCircle2 className="text-green-500" size={20} />
+                            Oturum Tamamlandı
+                        </h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
+                        </p>
                     </div>
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1">Harika İş Çıkardın!</h2>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">
-                        <span className="text-slate-900 dark:text-white font-bold">{activeSession.topic}</span> oturumu tamamlandı.
-                    </p>
-                </div>
-
-                {/* Score Summary Banner */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 text-center">
-                        <div className="flex items-center justify-center gap-2 text-slate-400 text-xs font-bold uppercase mb-1">
-                            <Clock size={12} /> Süre
-                        </div>
-                        <div className="text-2xl font-bold text-slate-900 dark:text-white">
-                            {elapsedMinutes} <span className="text-sm font-medium text-slate-400">dk</span>
-                        </div>
-                    </div>
-                    <div className={`p-4 rounded-2xl border text-center transition-colors ${totalQs > 0 ? (accuracy >= 70 ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' : 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800') : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700'}`}>
-                        <div className={`flex items-center justify-center gap-2 text-xs font-bold uppercase mb-1 ${totalQs>0 ? (accuracy>=70?'text-green-600':'text-orange-600') : 'text-slate-400'}`}>
-                            {totalQs > 0 ? (accuracy>=70 ? <Medal size={12}/> : <Star size={12}/>) : <Calculator size={12}/>} Başarı
-                        </div>
-                        <div className={`text-2xl font-bold ${totalQs>0 ? (accuracy>=70?'text-green-600 dark:text-green-400':'text-orange-600 dark:text-orange-400') : 'text-slate-900 dark:text-white'}`}>
-                            {totalQs > 0 ? `%${accuracy}` : '-'}
-                        </div>
+                    <div className="text-right">
+                        <span className="block text-2xl font-bold text-slate-800 dark:text-slate-100 font-mono tracking-tight">
+                           {elapsedMinutes}<span className="text-sm text-slate-400 font-sans ml-1">dk</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Toplam Süre</span>
                     </div>
                 </div>
 
-                {/* Input Grid (Card Style) */}
-                <div className="space-y-4 mb-8">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider text-center">Sonuçlarını Gir</p>
-                    
-                    <div className="grid grid-cols-3 gap-3">
-                        {/* Correct */}
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-green-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
-                            <div className="bg-white dark:bg-slate-800 border-2 border-green-100 dark:border-green-900/30 group-focus-within:border-green-500 rounded-2xl p-3 text-center transition-all">
-                                <label className="block text-green-600 dark:text-green-400 text-[10px] font-bold uppercase mb-1">Doğru</label>
+                {/* Body: Info Grid */}
+                <div className="p-6 space-y-6">
+                    {/* Session Details */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                             <div className="text-xs font-bold text-slate-400 uppercase mb-1">Ders</div>
+                             <div className="font-semibold text-slate-800 dark:text-white truncate">{subjectName}</div>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+                             <div className="text-xs font-bold text-slate-400 uppercase mb-1">Konu</div>
+                             <div className="font-semibold text-slate-800 dark:text-white truncate">{activeSession.topic}</div>
+                        </div>
+                    </div>
+
+                    {/* Stats Input Section */}
+                    <div>
+                        <div className="flex justify-between items-center mb-3">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Soru İstatistikleri</p>
+                            <span className="text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-1 rounded">Opsiyonel</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-green-600 dark:text-green-400 uppercase block text-center">Doğru</label>
                                 <input 
                                     type="number" 
-                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    className="w-full text-center p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all"
                                     value={summaryStats.correct}
                                     onChange={(e) => setSummaryStats(prev => ({...prev, correct: e.target.value}))}
-                                    placeholder="0"
+                                    placeholder="-"
                                 />
                             </div>
-                        </div>
-
-                        {/* Incorrect */}
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-red-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
-                            <div className="bg-white dark:bg-slate-800 border-2 border-red-100 dark:border-red-900/30 group-focus-within:border-red-500 rounded-2xl p-3 text-center transition-all">
-                                <label className="block text-red-600 dark:text-red-400 text-[10px] font-bold uppercase mb-1">Yanlış</label>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase block text-center">Yanlış</label>
                                 <input 
                                     type="number" 
-                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    className="w-full text-center p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all"
                                     value={summaryStats.incorrect}
                                     onChange={(e) => setSummaryStats(prev => ({...prev, incorrect: e.target.value}))}
-                                    placeholder="0"
+                                    placeholder="-"
                                 />
                             </div>
-                        </div>
-
-                        {/* Empty */}
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-slate-500 rounded-2xl opacity-0 group-focus-within:opacity-10 transition-opacity"></div>
-                            <div className="bg-white dark:bg-slate-800 border-2 border-slate-100 dark:border-slate-700 group-focus-within:border-slate-400 rounded-2xl p-3 text-center transition-all">
-                                <label className="block text-slate-500 dark:text-slate-400 text-[10px] font-bold uppercase mb-1">Boş</label>
+                             <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase block text-center">Boş</label>
                                 <input 
                                     type="number" 
-                                    className="w-full text-center text-2xl font-bold text-slate-900 dark:text-white bg-transparent focus:outline-none"
+                                    className="w-full text-center p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-slate-400/20 focus:border-slate-400 outline-none transition-all"
                                     value={summaryStats.empty}
                                     onChange={(e) => setSummaryStats(prev => ({...prev, empty: e.target.value}))}
-                                    placeholder="0"
+                                    placeholder="-"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* Net Result Bar */}
+                    {/* Result Card (Live Calculation) */}
                     {totalQs > 0 && (
-                        <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <span className="text-xs font-bold text-slate-500 uppercase">Toplam Net</span>
-                            <span className="text-lg font-bold text-blue-600 dark:text-blue-400">{net}</span>
+                        <div className="flex items-stretch gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                            <div className="flex-1 text-center border-r border-slate-200 dark:border-slate-700 pr-4">
+                                <div className="text-2xl font-black text-blue-600 dark:text-blue-400">{net}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">Toplam Net</div>
+                            </div>
+                             <div className="flex-1 text-center border-r border-slate-200 dark:border-slate-700 px-4">
+                                <div className={`text-2xl font-black ${accuracy >= 70 ? 'text-green-500' : accuracy >= 50 ? 'text-yellow-500' : 'text-orange-500'}`}>%{accuracy}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">Başarı</div>
+                            </div>
+                            <div className="flex-1 text-center pl-4">
+                                <div className="text-2xl font-black text-slate-700 dark:text-slate-200">{totalQs}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase">Toplam Soru</div>
+                            </div>
                         </div>
+                    )}
+
+                    {/* Linked Task Toggle */}
+                    {activeSession.linkedTaskId && (
+                        <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${markTaskCompleted ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            <div className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${markTaskCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-transparent border-slate-300 text-transparent'}`}>
+                                <Check size={14} strokeWidth={3} />
+                            </div>
+                            <input 
+                                type="checkbox" 
+                                className="hidden" 
+                                checked={markTaskCompleted} 
+                                onChange={() => setMarkTaskCompleted(!markTaskCompleted)} 
+                            />
+                            <div className="flex-1">
+                                <p className={`text-sm font-bold ${markTaskCompleted ? 'text-green-700 dark:text-green-400' : 'text-slate-600 dark:text-slate-400'}`}>Bağlı Görevi Tamamla</p>
+                                <p className="text-[10px] text-slate-400">Bu oturum bir göreve bağlı başlatıldı.</p>
+                            </div>
+                        </label>
                     )}
                 </div>
 
-                {/* Linked Task Toggle */}
-                {activeSession.linkedTaskId && (
-                    <div 
-                        onClick={() => setMarkTaskCompleted(!markTaskCompleted)}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all mb-6 text-left ${markTaskCompleted ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                {/* Footer Buttons */}
+                <div className="p-6 pt-0 mt-auto">
+                    <button 
+                        onClick={handleFinish} 
+                        className="w-full py-3.5 bg-primary hover:bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
-                        <div className={`p-1 rounded-full ${markTaskCompleted ? 'bg-green-500 text-white' : 'bg-slate-200 text-slate-400'}`}>
-                            <Check size={14} strokeWidth={3} />
-                        </div>
-                        <div className="flex-1">
-                            <p className={`text-sm font-bold ${markTaskCompleted ? 'text-green-700 dark:text-green-300' : 'text-slate-600 dark:text-slate-400'}`}>Bağlı Görevi Tamamla</p>
-                            <p className="text-xs text-slate-400">Bu çalışma bir göreve bağlıydı.</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Action Buttons */}
-                <button 
-                    onClick={handleFinish} 
-                    className="w-full py-4 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-2xl font-bold shadow-xl shadow-slate-900/20 active:scale-98 transition-all flex items-center justify-center gap-2 text-lg"
-                >
-                    <CheckCircle2 size={20} /> Kaydet ve Çık
-                </button>
+                        <Check size={20} /> Kaydet ve Bitir
+                    </button>
+                </div>
 
             </div>
         </div>
@@ -356,7 +336,7 @@ const Modals = React.memo(({
             {isTestModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md px-4 animate-fade-in">
                     <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl shadow-2xl p-6 border border-slate-200 dark:border-slate-800 animate-slide-up space-y-5 relative">
-                        <button onClick={()=>setIsTestModalOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><XCircle size={24}/></button>
+                        <button onClick={()=>setIsTestModalOpen(false)} aria-label="Kapat" className="absolute top-4 right-4 text-slate-400 hover:text-red-500"><XCircle size={24}/></button>
                         
                         <div className="flex items-center gap-3">
                              <div className="p-2 bg-primary/10 rounded-lg text-primary"><FilePlus2 size={24}/></div>
@@ -468,7 +448,7 @@ const Modals = React.memo(({
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Manuel veri girişi</p>
                                 </div>
                             </div>
-                            <button onClick={()=>setIsManualLogOpen(false)} className="text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 p-2 rounded-full">
+                            <button onClick={()=>setIsManualLogOpen(false)} aria-label="Kapat" className="text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors bg-slate-100 dark:bg-slate-800 p-2 rounded-full">
                                 <X size={20}/>
                             </button>
                         </div>
@@ -785,14 +765,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
           {!isZenMode && (
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Odak Modu</h1>
-                <button onClick={() => setIsZenMode(true)} className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                <button onClick={() => setIsZenMode(true)} aria-label="Zen Modunu Aç" className="flex items-center space-x-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-600 transition">
                     <Maximize2 size={16} /> <span className="text-xs font-bold">Zen</span>
                 </button>
             </div>
           )}
 
           {isZenMode && (
-             <button onClick={() => setIsZenMode(false)} className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition z-50 backdrop-blur-md">
+             <button onClick={() => setIsZenMode(false)} aria-label="Zen Modunu Kapat" className="absolute top-6 right-6 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition z-50 backdrop-blur-md">
                 <Minimize2 size={24} />
              </button>
           )}
@@ -925,7 +905,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
 
                 {/* Controls */}
                 <div className="flex items-center gap-4 z-10 w-full justify-center max-w-lg mt-4">
-                    <button onClick={() => setIsStopConfirmOpen(true)} className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95" title="İptal Et (Çöp)"><Trash2 size={24}/></button>
+                    <button onClick={() => setIsStopConfirmOpen(true)} aria-label="Oturumu İptal Et" className="p-4 rounded-2xl bg-slate-100 dark:bg-slate-700 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all active:scale-95" title="İptal Et (Çöp)"><Trash2 size={24}/></button>
                     
                     <button onClick={activeSession.isPaused ? resumeSession : pauseSession} className="flex-1 py-4 rounded-2xl bg-primary text-white font-bold text-xl flex items-center justify-center gap-3 shadow-xl shadow-primary/30 hover:brightness-110 active:scale-95 transition-all">
                         {activeSession.isPaused ? <Play size={24} fill="currentColor" /> : <Pause size={24} fill="currentColor" />}
@@ -933,7 +913,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                     </button>
                     
                     {/* NEW: Finish Button */}
-                    <button onClick={() => finishSession()} className="p-4 rounded-2xl bg-green-500 text-white hover:bg-green-600 transition-all active:scale-95 shadow-lg shadow-green-500/20" title="Bitir ve Kaydet"><Check size={24} strokeWidth={3} /></button>
+                    <button onClick={() => finishSession()} aria-label="Oturumu Bitir ve Kaydet" className="p-4 rounded-2xl bg-green-500 text-white hover:bg-green-600 transition-all active:scale-95 shadow-lg shadow-green-500/20" title="Bitir ve Kaydet"><Check size={24} strokeWidth={3} /></button>
                 </div>
             </div>
 
@@ -1008,7 +988,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
                                                 <span className="text-slate-300">|</span>
                                                 <span className="text-red-500">{log.incorrect}Y</span>
                                             </div>
-                                            <button onClick={() => removeTestLog(log.id)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded transition-colors"><Trash2 size={14}/></button>
+                                            <button onClick={() => removeTestLog(log.id)} aria-label="Test sonucunu sil" className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 p-1.5 rounded transition-colors"><Trash2 size={14}/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -1174,6 +1154,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onChangeView }) => {
          {/* FAB Mobile - Only for quick task to keep it clean */}
          <button 
             onClick={() => setIsQuickTaskOpen(true)}
+            aria-label="Hızlı Görev Ekle"
             className="fixed bottom-24 right-6 w-12 h-12 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full shadow-xl flex items-center justify-center hover:scale-105 transition-transform z-40 md:hidden"
          >
             <Plus size={24} />

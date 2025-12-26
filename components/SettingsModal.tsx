@@ -299,7 +299,7 @@ export const SettingsModal: React.FC = () => {
                 {/* Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Ayarlar</h2>
-                    <button onClick={toggleSettings} className="text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors bg-white dark:bg-slate-700 p-1.5 rounded-full shadow-sm border border-slate-200 dark:border-slate-600">
+                    <button onClick={toggleSettings} aria-label="Ayarları Kapat" className="text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors bg-white dark:bg-slate-700 p-1.5 rounded-full shadow-sm border border-slate-200 dark:border-slate-600">
                         <X size={20} />
                     </button>
                 </div>

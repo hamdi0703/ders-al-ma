@@ -22,6 +22,7 @@ export interface Task {
   priority: TaskPriority;
   subjectId?: string; // New: Link task to a subject
   dueDate?: number;   // New: Due date timestamp
+  tags?: string[];    // New: Tags for filtering
   createdAt: number;
 }
 

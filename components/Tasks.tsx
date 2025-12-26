@@ -1,9 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
     Plus, CheckCircle2, Circle, Trash2, ListTodo, Flag, 
     Calendar, BookOpen, ChevronDown, ChevronUp, Edit2, X, Target,
-    LayoutGrid, List, Columns, ArrowUpDown, Clock
+    LayoutGrid, List, Columns, ArrowUpDown, Clock, Tag
 } from 'lucide-react';
 import { useStudy } from '../context/StudyContext';
 import { TaskPriority, Task } from '../types';
@@ -20,10 +20,9 @@ const getPriorityColor = (p: TaskPriority) => {
     }
 };
 
-const getRelativeTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    // User requested full date instead of "Just now" style relative time
-    return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' });
+const getTaskDateLabel = (timestamp: number) => {
+    // Shows explicit date: 15.05.2024
+    return new Date(timestamp).toLocaleDateString('tr-TR');
 };
 
 const getDeadlineBadge = (timestamp?: number) => {
@@ -66,6 +65,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isCompact = false, onEdit }) 
                 <div className="flex items-start gap-3 flex-1 min-w-0">
                     <button 
                         onClick={() => toggleTask(task.id)}
+                        aria-label="Görevi Tamamla"
                         className="mt-0.5 text-slate-300 hover:text-green-500 transition-colors flex-shrink-0"
                     >
                         <Circle size={isCompact ? 18 : 22} />
@@ -94,23 +94,29 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, isCompact = false, onEdit }) 
                                 </span>
                             )}
 
+                            {task.tags && task.tags.length > 0 && task.tags.map(tag => (
+                                <span key={tag} className="text-[10px] text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
+                                    {tag}
+                                </span>
+                            ))}
+
                             {getDeadlineBadge(task.dueDate)}
                         </div>
 
                         {/* Created At Info */}
                         <div className="flex items-center gap-1 mt-0.5">
                             <Clock size={10} className="text-slate-300" />
-                            <span className="text-[10px] text-slate-400">{getRelativeTime(task.createdAt)}</span>
+                            <span className="text-[10px] text-slate-400">{getTaskDateLabel(task.createdAt)}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Actions */}
                 <div className={`flex items-center gap-1 ${isCompact ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity flex-shrink-0`}>
-                    <button onClick={() => onEdit(task)} className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+                    <button onClick={() => onEdit(task)} aria-label="Görevi Düzenle" className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
                         <Edit2 size={14} />
                     </button>
-                    <button onClick={() => deleteTask(task.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
+                    <button onClick={() => deleteTask(task.id)} aria-label="Görevi Sil" className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg">
                         <Trash2 size={14} />
                     </button>
                 </div>
@@ -134,6 +140,10 @@ const Tasks: React.FC = () => {
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
   const [dueDateStr, setDueDateStr] = useState(''); 
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
+
+  const formRef = useRef<HTMLDivElement>(null);
 
   // --- Helpers ---
   const handleResetForm = () => {
@@ -141,6 +151,8 @@ const Tasks: React.FC = () => {
       setPriority('medium');
       setSelectedSubjectId('');
       setDueDateStr('');
+      setTags([]);
+      setTagInput('');
       setFormMode('add');
       setEditingId(null);
   };
@@ -152,13 +164,14 @@ const Tasks: React.FC = () => {
     const dateTimestamp = dueDateStr ? new Date(dueDateStr).getTime() : undefined;
 
     if (formMode === 'add') {
-        addTask(title.trim(), priority, selectedSubjectId || undefined, dateTimestamp);
+        addTask(title.trim(), priority, selectedSubjectId || undefined, dateTimestamp, tags);
     } else if (editingId) {
         editTask(editingId, {
             title: title.trim(),
             priority,
             subjectId: selectedSubjectId || undefined,
-            dueDate: dateTimestamp
+            dueDate: dateTimestamp,
+            tags
         });
     }
     handleResetForm();
@@ -168,6 +181,7 @@ const Tasks: React.FC = () => {
       setTitle(task.title);
       setPriority(task.priority);
       setSelectedSubjectId(task.subjectId || '');
+      setTags(task.tags || []);
       if (task.dueDate) {
           const d = new Date(task.dueDate);
           const year = d.getFullYear();
@@ -179,6 +193,23 @@ const Tasks: React.FC = () => {
       }
       setEditingId(task.id);
       setFormMode('edit');
+      
+      // Smooth scroll to form
+      setTimeout(() => {
+          formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+  };
+
+  const addTag = (tag: string) => {
+      const formatted = tag.startsWith('#') ? tag : `#${tag}`;
+      if (!tags.includes(formatted) && tags.length < 5) {
+          setTags([...tags, formatted]);
+      }
+      setTagInput('');
+  };
+
+  const removeTag = (tagToRemove: string) => {
+      setTags(tags.filter(t => t !== tagToRemove));
   };
 
   // --- Derived Data ---
@@ -330,7 +361,7 @@ const Tasks: React.FC = () => {
           <div className="flex flex-col lg:flex-row gap-4">
               
               {/* Form Area */}
-              <div className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm transition-all focus-within:ring-2 ring-primary/20">
+              <div ref={formRef} className="flex-1 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm transition-all focus-within:ring-2 ring-primary/20">
                   <form onSubmit={handleSubmit}>
                       <div className="flex items-center gap-2 mb-3 border-b border-slate-100 dark:border-slate-700 pb-2">
                           {formMode === 'edit' ? <Edit2 size={18} className="text-primary"/> : <Plus size={18} className="text-slate-400"/>}
@@ -349,6 +380,32 @@ const Tasks: React.FC = () => {
                           )}
                       </div>
                       
+                      {/* Tags Input Area */}
+                      <div className="flex flex-wrap items-center gap-2 mb-3 px-1">
+                          {tags.map(tag => (
+                              <span key={tag} className="flex items-center gap-1 text-[10px] bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
+                                  {tag}
+                                  <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500"><X size={10}/></button>
+                              </span>
+                          ))}
+                          <div className="relative group flex items-center">
+                              <Tag size={12} className="text-slate-400 mr-1"/>
+                              <input 
+                                type="text"
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if(e.key === 'Enter') {
+                                        e.preventDefault();
+                                        if(tagInput.trim()) addTag(tagInput.trim());
+                                    }
+                                }}
+                                placeholder="Etiket..."
+                                className="bg-transparent text-xs text-slate-600 dark:text-slate-300 focus:outline-none w-20 border-b border-transparent focus:border-indigo-500 placeholder-slate-400/70"
+                              />
+                          </div>
+                      </div>
+
                       <div className="flex flex-wrap gap-3 items-center justify-between">
                           <div className="flex flex-wrap gap-2">
                               {/* Priority */}
@@ -433,6 +490,7 @@ const Tasks: React.FC = () => {
                   <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
                       <button 
                         onClick={() => setViewMode('list')}
+                        aria-label="Liste Görünümü"
                         className={`p-2 rounded-lg transition-all flex items-center justify-center ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         title="Liste"
                       >
@@ -440,6 +498,7 @@ const Tasks: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => setViewMode('grid')}
+                        aria-label="Izgara Görünümü"
                         className={`p-2 rounded-lg transition-all flex items-center justify-center ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         title="Kart"
                       >
@@ -447,6 +506,7 @@ const Tasks: React.FC = () => {
                       </button>
                       <button 
                         onClick={() => setViewMode('board')}
+                        aria-label="Pano Görünümü"
                         className={`p-2 rounded-lg transition-all flex items-center justify-center ${viewMode === 'board' ? 'bg-white dark:bg-slate-700 text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                         title="Pano"
                       >
@@ -483,6 +543,7 @@ const Tasks: React.FC = () => {
                         </div>
                         <button 
                             onClick={() => deleteTask(task.id)}
+                            aria-label="Görevi Sil"
                             className="p-1.5 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                         >
                             <Trash2 size={16} />

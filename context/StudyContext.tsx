@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { StudySession, Subject, SUBJECTS, AppSettings, TimerMode, QuestionStats, TestLog, THEME_COLORS, Task, TaskPriority, TopicStatus } from '../types';
 
@@ -23,7 +24,7 @@ interface StudyContextType {
   clearSubjectTopics: (subjectId: string) => void;
   removeAllSubjects: () => void;
   updateTopicStatus: (subjectId: string, topic: string, status: TopicStatus) => void;
-  addTask: (title: string, priority?: TaskPriority, subjectId?: string, dueDate?: number) => void;
+  addTask: (title: string, priority?: TaskPriority, subjectId?: string, dueDate?: number, tags?: string[]) => void;
   editTask: (id: string, updates: Partial<Task>) => void;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
@@ -141,7 +142,8 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [tasks, setTasks] = useState<Task[]>(() => {
       try {
           const saved = localStorage.getItem('study_tasks');
-          return saved ? JSON.parse(saved) : [];
+          const parsed = saved ? JSON.parse(saved) : [];
+          return parsed.map((t: any) => ({...t, tags: t.tags || []}));
       } catch (e) { return []; }
   });
 
@@ -270,7 +272,10 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const removeAllSubjects = () => setSubjects([]);
   const updateTopicStatus = (subjectId: string, topic: string, status: TopicStatus) => setSubjects(prev => prev.map(s => (s.id === subjectId ? { ...s, topicStatuses: { ...(s.topicStatuses || {}), [topic]: status } } : s)));
 
-  const addTask = (title: string, priority: TaskPriority = 'medium', subjectId?: string, dueDate?: number) => setTasks(prev => [{ id: Date.now().toString(), title, isCompleted: false, priority, subjectId, dueDate, createdAt: Date.now() }, ...prev]);
+  // Updated addTask to support tags
+  const addTask = (title: string, priority: TaskPriority = 'medium', subjectId?: string, dueDate?: number, tags: string[] = []) => 
+      setTasks(prev => [{ id: Date.now().toString(), title, isCompleted: false, priority, subjectId, dueDate, tags, createdAt: Date.now() }, ...prev]);
+  
   const editTask = (id: string, updates: Partial<Task>) => setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   const toggleTask = (id: string) => setTasks(prev => prev.map(t => t.id === id ? { ...t, isCompleted: !t.isCompleted } : t));
   const deleteTask = (id: string) => setTasks(prev => prev.filter(t => t.id !== id));
@@ -323,11 +328,12 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       downloadCSV([headers.join(','), ...rows].join('\n'), `studyflow_gecmis_${getFormattedDate()}.csv`);
   };
   const exportTasksToCSV = () => {
-      const headers = ['Görev', 'Durum', 'Öncelik', 'Oluşturulma Tarihi'];
+      const headers = ['Görev', 'Durum', 'Öncelik', 'Etiketler', 'Oluşturulma Tarihi'];
       const rows = tasks.map(t => {
           const date = new Date(t.createdAt).toLocaleDateString('tr-TR');
           const priority = t.priority === 'high' ? 'Yüksek' : t.priority === 'low' ? 'Düşük' : 'Orta';
-          return [escapeCSV(t.title), t.isCompleted?'Tamamlandı':'Yapılacak', priority, date].join(',');
+          const tags = t.tags ? t.tags.join(' ') : '';
+          return [escapeCSV(t.title), t.isCompleted?'Tamamlandı':'Yapılacak', priority, escapeCSV(tags), date].join(',');
       });
       downloadCSV([headers.join(','), ...rows].join('\n'), `studyflow_gorevler_${getFormattedDate()}.csv`);
   };
@@ -374,7 +380,8 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                   ...t,
                   id: t.id || `task_${Date.now()}_${Math.random()}`,
                   isCompleted: !!t.isCompleted,
-                  createdAt: t.createdAt || Date.now()
+                  createdAt: t.createdAt || Date.now(),
+                  tags: Array.isArray(t.tags) ? t.tags : []
               }));
               setTasks(safeTasks);
           }

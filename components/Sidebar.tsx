@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -66,7 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onOpenSett
             <span className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">StudyFlow</span>
           </div>
           {/* Close Button for Mobile Drawer */}
-          <button onClick={onCloseMobile} className="md:hidden text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+          <button onClick={onCloseMobile} aria-label="Menüyü Kapat" className="md:hidden text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
             <X size={24} />
           </button>
         </div>
@@ -153,6 +154,7 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({ currentView, onChang
             <div className="relative -top-6">
                 <button 
                     onClick={() => onChangeView('new-session')}
+                    aria-label="Yeni Çalışma Başlat"
                     className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transform transition-transform active:scale-95 ${
                         currentView === 'new-session' 
                         ? 'bg-slate-800 dark:bg-white text-white dark:text-slate-900 ring-4 ring-slate-100 dark:ring-slate-800' 
@@ -174,6 +176,7 @@ export const MobileNavbar: React.FC<MobileNavbarProps> = ({ currentView, onChang
             {/* 5. Menu (Opens Drawer) */}
             <button 
                 onClick={onToggleMobileMenu}
+                aria-label="Menüyü Aç"
                 className="flex flex-col items-center justify-center w-16 space-y-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
             >
                 <MenuIcon size={22} />
