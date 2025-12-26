@@ -4,6 +4,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { ViewState } from './types';
 import { StudyProvider, TimerProvider, useStudy } from './context/StudyContext';
 import { Loader2 } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Lazy Load Components for Performance Optimization
 const Dashboard = React.lazy(() => import('./components/Dashboard'));
@@ -73,6 +74,9 @@ function MainContent() {
           </Suspense>
         </div>
       </main>
+      
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
