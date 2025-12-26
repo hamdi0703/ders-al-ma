@@ -7,7 +7,6 @@ import {
   SlidersHorizontal, ArrowUpDown, CheckCircle2, AlertCircle,
   MoreHorizontal, ChevronDown, Check
 } from 'lucide-react';
-import { SUBJECTS } from '../types';
 import { useStudy } from '../context/StudyContext';
 
 const History: React.FC = () => {
@@ -333,7 +332,10 @@ const History: React.FC = () => {
               filteredHistory.map((item, index) => {
                   const prevItem = filteredHistory[index - 1];
                   const showDateSeparator = !prevItem || prevItem.date !== item.date;
-                  const subject = SUBJECTS.find(s => s.id === item.subject);
+                  
+                  // FIXED: Use dynamic subjects list instead of static SUBJECTS constant
+                  const subject = subjects.find(s => s.id === item.subject);
+                  
                   const isEditing = editingId === item.id;
                   const netCount = item.questionStats ? (item.questionStats.correct - (item.questionStats.incorrect * 0.25)) : 0;
                   
@@ -365,7 +367,7 @@ const History: React.FC = () => {
                                                     {new Date(item.timestamp).toLocaleTimeString('tr-TR', {hour: '2-digit', minute:'2-digit'})}
                                                 </span>
                                                 <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${subject?.color.replace('bg-', 'text-').replace('600', '600') || 'text-slate-500'} bg-slate-100 dark:bg-slate-900`}>
-                                                    {subject?.name}
+                                                    {subject?.name || 'Bilinmeyen Ders'}
                                                 </span>
                                                 {item.status === 'interrupted' && (
                                                     <span className="text-[10px] text-red-500 font-bold bg-red-50 dark:bg-red-900/20 px-1.5 rounded flex items-center gap-0.5"><AlertCircle size={10}/> Yarım</span>
