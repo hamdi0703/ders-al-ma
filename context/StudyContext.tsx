@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { StudySession, Subject, SUBJECTS, AppSettings, TimerMode, QuestionStats, TestLog, THEME_COLORS, Task, TaskPriority, TopicStatus } from '../types';
 
@@ -9,8 +8,6 @@ interface StudyContextType {
   settings: AppSettings;
   tasks: Task[];
   isSettingsOpen: boolean;
-  installPrompt: any;
-  setInstallPrompt: (e: any) => void;
   // CRUD Actions
   addHistoryItem: (item: StudySession) => void;
   deleteHistoryItem: (id: string) => void;
@@ -22,7 +19,7 @@ interface StudyContextType {
   addTopicsToSubject: (subjectId: string, topics: string[]) => void;
   loadCurriculum: (data: {name: string, topics: string[], icon: string, color: string}[]) => void;
   removeTopicFromSubject: (subjectId: string, topic: string) => void;
-  renameTopic: (subjectId: string, oldName: string, newName: string) => void; // NEW: Safe rename
+  renameTopic: (subjectId: string, oldName: string, newName: string) => void; 
   clearSubjectTopics: (subjectId: string) => void;
   removeAllSubjects: () => void;
   updateTopicStatus: (subjectId: string, topic: string, status: TopicStatus) => void;
@@ -149,7 +146,6 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // --- Effects ---
   useEffect(() => {
@@ -200,7 +196,6 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }));
   };
   
-  // NEW: Rename topic safely across Subjects and History to prevent data decoupling
   const renameTopic = (subjectId: string, oldName: string, newName: string) => {
       if (!newName.trim() || oldName === newName) return;
       const trimmedNewName = newName.trim();
@@ -427,7 +422,7 @@ export const StudyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   return (
     <StudyContext.Provider value={{
-      history, subjects, settings, tasks, isSettingsOpen, installPrompt, setInstallPrompt,
+      history, subjects, settings, tasks, isSettingsOpen,
       addHistoryItem, deleteHistoryItem, updateHistoryItem, addNewSubject, updateSubject, deleteSubject, 
       addTopicToSubject, addTopicsToSubject, loadCurriculum, removeTopicFromSubject, clearSubjectTopics, renameTopic,
       removeAllSubjects, updateTopicStatus, addTask, editTask, toggleTask, deleteTask, 

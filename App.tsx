@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense } from 'react';
 import Sidebar, { MobileNavbar } from './components/Sidebar';
 import { SettingsModal } from './components/SettingsModal'; 
@@ -7,7 +6,7 @@ import { StudyProvider, TimerProvider, useStudy } from './context/StudyContext';
 import { Loader2 } from 'lucide-react';
 
 // Lazy Load Components for Performance Optimization
-const Dashboard = React.lazy(() => import('./components/Dashboard').then(module => ({ default: module.Dashboard })));
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
 const NewSession = React.lazy(() => import('./components/NewSession'));
 const History = React.lazy(() => import('./components/History'));
 const Analytics = React.lazy(() => import('./components/Analytics'));
@@ -24,18 +23,7 @@ const PageLoader = () => (
 function MainContent() {
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { toggleSettings, setInstallPrompt } = useStudy();
-
-  // Listen for PWA Install Prompt
-  useEffect(() => {
-    const handler = (e: any) => {
-      e.preventDefault();
-      setInstallPrompt(e);
-      console.log("PWA Install Prompt Captured");
-    };
-    window.addEventListener('beforeinstallprompt', handler);
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, [setInstallPrompt]);
+  const { toggleSettings } = useStudy();
 
   const handleViewChange = (view: ViewState) => {
     setCurrentView(view);

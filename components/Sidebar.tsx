@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { 
   LayoutDashboard, 
@@ -26,11 +25,8 @@ interface SidebarProps {
 
 // --- Desktop & Drawer Sidebar ---
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onOpenSettings, isMobileOpen = false, onCloseMobile }) => {
-  const { settings, installPrompt, setInstallPrompt } = useStudy();
+  const { settings } = useStudy();
   
-  // Check if running in standalone mode (installed PWA)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-
   const menuItems = [
     { id: 'dashboard', label: 'Panel', icon: LayoutDashboard },
     { id: 'new-session', label: 'Yeni Çalışma', icon: PlusCircle },
@@ -43,16 +39,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onOpenSett
   const handleNavClick = (id: string) => {
     onChangeView(id as ViewState);
     if (onCloseMobile) onCloseMobile();
-  };
-
-  const handleInstallClick = () => {
-    if (!installPrompt) return;
-    installPrompt.prompt();
-    installPrompt.userChoice.then((choiceResult: any) => {
-      if (choiceResult.outcome === 'accepted') {
-        setInstallPrompt(null);
-      }
-    });
   };
 
   return (
@@ -108,16 +94,6 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, onOpenSett
           })}
           
           <div className="pt-4 mt-4 border-t border-slate-200/50 dark:border-slate-700/50 space-y-2">
-             {installPrompt && !isStandalone && (
-               <button 
-                    onClick={handleInstallClick}
-                    className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 transition-all hover:scale-[1.02]"
-                >
-                  <Download size={20} />
-                  <span className="font-bold">Uygulamayı Yükle</span>
-                </button>
-             )}
-             
              <button 
                   onClick={() => { onOpenSettings(); if(onCloseMobile) onCloseMobile(); }}
                   className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100 transition-all hover:translate-x-1"

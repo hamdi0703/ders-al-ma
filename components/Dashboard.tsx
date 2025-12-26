@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect } from 'react';
 import { 
   Play, Pause, RotateCcw, Zap, Plus, Minus, FilePlus2, 
@@ -6,7 +5,7 @@ import {
   Maximize2, Minimize2, Trash2, PenLine, CheckSquare, 
   ListTodo, ClipboardEdit, Flame, Clock, Calendar, ArrowRight, History, XCircle,
   MoreHorizontal, Flag, Check, X, Percent, Calculator, Medal, Star, Sparkles, CheckCircle2,
-  Timer, Brain, Layers, Hourglass
+  Timer, Brain, Layers, Hourglass, ChevronDown, FolderOpen
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, CartesianGrid, XAxis } from 'recharts';
 import { useStudy, useTimer } from '../context/StudyContext';
@@ -259,7 +258,7 @@ const SessionSummary = ({ activeSession, finishSession, toggleTask }: { activeSe
                         </div>
                         <div className="flex-1">
                             <p className={`text-sm font-bold ${markTaskCompleted ? 'text-green-700 dark:text-green-300' : 'text-slate-600 dark:text-slate-400'}`}>Bağlı Görevi Tamamla</p>
-                            <p className="text-[10px] text-slate-400">Bu çalışma bir göreve bağlıydı.</p>
+                            <p className="text-xs text-slate-400">Bu çalışma bir göreve bağlıydı.</p>
                         </div>
                     </div>
                 )}
@@ -291,6 +290,8 @@ const Modals = React.memo(({
     const [tempTopic, setTempTopic] = useState('');
     const [quickTaskTitle, setQuickTaskTitle] = useState('');
     const [quickTaskPriority, setQuickTaskPriority] = useState<TaskPriority>('medium');
+    
+    // Manual Log State
     const [manualForm, setManualForm] = useState({ 
         subjectId: subjects[0]?.id || '', 
         topic: '', 
@@ -300,6 +301,7 @@ const Modals = React.memo(({
         empty: '',
         date: new Date().toISOString().split('T')[0] // Default to today YYYY-MM-DD
     });
+    const [showManualTopicSelector, setShowManualTopicSelector] = useState(false);
 
     useEffect(() => {
         if (isTestModalOpen && activeSession) setTestForm(prev => ({ ...prev, subjectId: activeSession.subjectId, topic: activeSession.topic }));
@@ -345,6 +347,7 @@ const Modals = React.memo(({
         // Reset form except Subject (user might log multiple for same subject)
         setManualForm(prev => ({ ...prev, topic: '', duration: '', correct: '', incorrect: '', empty: '' }));
         setIsManualLogOpen(false);
+        setShowManualTopicSelector(false);
     };
 
     return (
@@ -470,36 +473,61 @@ const Modals = React.memo(({
                             </button>
                         </div>
 
-                        {/* Subject Selector (Visual Strip) */}
+                        {/* Updated Subject Selector (Dropdown) */}
                         <div className="mb-6">
                             <label className="text-xs font-bold text-slate-400 uppercase mb-2 block px-1">Ders Seçimi</label>
-                            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar snap-x">
-                                {subjects.map((s: Subject) => {
-                                    const isSelected = manualForm.subjectId === s.id;
-                                    // Extract color name for background utility (e.g. bg-blue-500 -> blue)
-                                    const colorBase = s.color?.split('-')[1] || 'blue'; 
-                                    return (
-                                        <button 
-                                            key={s.id} 
-                                            onClick={()=>setManualForm({...manualForm, subjectId: s.id})} 
-                                            className={`snap-start shrink-0 px-4 py-3 rounded-2xl border transition-all flex flex-col items-center gap-1 min-w-[90px] ${
-                                                isSelected 
-                                                ? `bg-${colorBase}-50 dark:bg-${colorBase}-900/20 border-${colorBase}-500 ring-1 ring-${colorBase}-500 text-${colorBase}-600 dark:text-${colorBase}-400` 
-                                                : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                            }`}
-                                        >
-                                            <span className="font-bold text-sm truncate w-full text-center">{s.name}</span>
-                                            {isSelected && <div className={`w-1.5 h-1.5 rounded-full bg-${colorBase}-500 mt-1`}></div>}
-                                        </button>
-                                    );
-                                })}
+                            <div className="relative">
+                                <select 
+                                    value={manualForm.subjectId}
+                                    onChange={(e) => {
+                                        setManualForm({...manualForm, subjectId: e.target.value});
+                                        setShowManualTopicSelector(false); // Reset topic dropdown on subject change
+                                    }}
+                                    className="w-full appearance-none bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-900 dark:text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all font-medium pr-10"
+                                >
+                                    {subjects.map((s: Subject) => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                             </div>
                         </div>
 
-                        {/* Topic & Date Row */}
+                        {/* Topic & Date Row with Topic Selector */}
                         <div className="grid grid-cols-3 gap-4 mb-6">
-                            <div className="col-span-2">
-                                <label className="text-xs font-bold text-slate-400 uppercase mb-2 block px-1">Konu Başlığı</label>
+                            <div className="col-span-2 relative">
+                                <div className="flex justify-between items-center mb-2 px-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase block">Konu Başlığı</label>
+                                    {subjects.find(s => s.id === manualForm.subjectId)?.topics && subjects.find(s => s.id === manualForm.subjectId)!.topics.length > 0 && (
+                                        <button 
+                                            onClick={() => setShowManualTopicSelector(!showManualTopicSelector)}
+                                            className="text-xs text-blue-500 dark:text-blue-400 font-bold flex items-center gap-1 hover:underline"
+                                        >
+                                            <FolderOpen size={12} /> Konulardan Seç
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                {/* Topic Selector Dropdown */}
+                                {showManualTopicSelector && (
+                                    <div className="absolute top-16 left-0 w-full z-20 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl p-2 max-h-48 overflow-y-auto animate-fade-in">
+                                        <h4 className="text-xs font-bold text-slate-400 px-3 py-1 uppercase truncate">{subjects.find(s => s.id === manualForm.subjectId)?.name} Konuları</h4>
+                                        {subjects.find(s => s.id === manualForm.subjectId)?.topics?.map((t, idx) => (
+                                            <button 
+                                                key={idx}
+                                                onClick={() => {
+                                                    setManualForm({...manualForm, topic: t});
+                                                    setShowManualTopicSelector(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg truncate flex items-center gap-2"
+                                            >
+                                                <FolderOpen size={14} className="text-slate-400"/>
+                                                {t}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <div className="relative group">
                                     <input 
                                         type="text" 
